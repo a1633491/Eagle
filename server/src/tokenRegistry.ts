@@ -5,8 +5,11 @@ import { createPublicClient, getAddress, http, isAddress, parseAbiItem } from 'v
 const DEFAULT_FACTORY_ADDRESS = '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE';
 const DEFAULT_QUOTE_TOKEN_PRICE = 0.0000049;
 const DEFAULT_SYNC_BLOCK_WINDOW = 20000n;
+const DEFAULT_SYNC_CHUNK_SIZE = 2000n;
+const DEFAULT_SYNC_MAX_CHUNKS_PER_RUN = 8;
 const DEFAULT_SYNC_COOLDOWN_MS = 30_000;
 const DEFAULT_CACHE_TTL_SECONDS = 30;
+const FACTORY_SYNC_STATE_KEY = 'factory-launch-sync';
 
 const tokenLaunchedEvent = parseAbiItem(
   'event TokenLaunched(address indexed token, address indexed creator, address indexed quoteToken, address pool, uint24 fee, int24 initialTick, uint256 totalSupply, uint256[] lockedPositionIds, string name, string symbol, string metadataURI)',
@@ -136,6 +139,26 @@ type StoredTokenDocument = {
   updatedAt: Date;
 };
 
+export type SyncStatus = {
+  key: string;
+  syncStartedFrom: string;
+  lastSyncedBlock: string;
+  latestKnownBlock: string;
+  lastSyncStatus: 'idle' | 'syncing' | 'done' | 'error';
+  lastSyncError: string;
+  updatedAt: string;
+};
+
+type StoredSyncStateDocument = {
+  key: string;
+  syncStartedFrom: string;
+  lastSyncedBlock: string;
+  latestKnownBlock: string;
+  lastSyncStatus: 'idle' | 'syncing' | 'done' | 'error';
+  lastSyncError: string;
+  updatedAt: Date;
+};
+
 const chartPointSchema = new Schema<ChartPoint>(
   {
     time: { type: Number, required: true },
@@ -192,7 +215,27 @@ const StoredTokenModel =
   (mongoose.models.StoredToken as mongoose.Model<StoredTokenDocument> | undefined) ??
   mongoose.model<StoredTokenDocument>('StoredToken', storedTokenSchema);
 
+const storedSyncStateSchema = new Schema<StoredSyncStateDocument>(
+  {
+    key: { type: String, required: true, unique: true, index: true },
+    syncStartedFrom: { type: String, required: true, default: '0' },
+    lastSyncedBlock: { type: String, required: true, default: '0' },
+    latestKnownBlock: { type: String, required: true, default: '0' },
+    lastSyncStatus: { type: String, enum: ['idle', 'syncing', 'done', 'error'], required: true, default: 'idle' },
+    lastSyncError: { type: String, required: true, default: '' },
+    updatedAt: { type: Date, required: true, default: () => new Date() },
+  },
+  {
+    versionKey: false,
+  },
+);
+
+const StoredSyncStateModel =
+  (mongoose.models.StoredSyncState as mongoose.Model<StoredSyncStateDocument> | undefined) ??
+  mongoose.model<StoredSyncStateDocument>('StoredSyncState', storedSyncStateSchema);
+
 const inMemoryTokens = new Map<string, StoredTokenDocument>();
+let inMemorySyncState: StoredSyncStateDocument | null = null;
 
 let mongoConnectPromise: Promise<typeof mongoose> | null = null;
 let redisClientPromise: Promise<RedisClientType | null> | null = null;
@@ -326,6 +369,18 @@ function buildOverview(tokens: TokenRecord[], fallback: FallbackOverview) {
   };
 }
 
+function toSyncStatus(document: StoredSyncStateDocument): SyncStatus {
+  return {
+    key: document.key,
+    syncStartedFrom: document.syncStartedFrom,
+    lastSyncedBlock: document.lastSyncedBlock,
+    latestKnownBlock: document.latestKnownBlock,
+    lastSyncStatus: document.lastSyncStatus,
+    lastSyncError: document.lastSyncError,
+    updatedAt: document.updatedAt.toISOString(),
+  };
+}
+
 async function getRedisClient() {
   const redisUrl = process.env.REDIS_URL?.trim();
   if (!redisUrl) return null;
@@ -397,6 +452,54 @@ async function readStoredToken(address: string) {
     } as StoredTokenDocument;
   }
   return inMemoryTokens.get(normalized) ?? null;
+}
+
+async function readSyncState() {
+  const connection = await getMongoConnection();
+  if (connection) {
+    const row = await StoredSyncStateModel.findOne({ key: FACTORY_SYNC_STATE_KEY }).lean();
+    if (!row) return null;
+    return {
+      ...row,
+      updatedAt: new Date(row.updatedAt),
+    } as StoredSyncStateDocument;
+  }
+  return inMemorySyncState;
+}
+
+async function writeSyncState(update: Partial<StoredSyncStateDocument> & { key?: string }) {
+  const nextState: StoredSyncStateDocument = {
+    key: update.key ?? FACTORY_SYNC_STATE_KEY,
+    syncStartedFrom: update.syncStartedFrom ?? '0',
+    lastSyncedBlock: update.lastSyncedBlock ?? '0',
+    latestKnownBlock: update.latestKnownBlock ?? '0',
+    lastSyncStatus: update.lastSyncStatus ?? 'idle',
+    lastSyncError: update.lastSyncError ?? '',
+    updatedAt: update.updatedAt ?? new Date(),
+  };
+
+  const connection = await getMongoConnection();
+  if (connection) {
+    await StoredSyncStateModel.findOneAndUpdate(
+      { key: nextState.key },
+      nextState,
+      { upsert: true, setDefaultsOnInsert: true },
+    );
+  } else {
+    inMemorySyncState = nextState;
+  }
+}
+
+async function resetSyncState(startBlock: bigint) {
+  await writeSyncState({
+    key: FACTORY_SYNC_STATE_KEY,
+    syncStartedFrom: startBlock.toString(),
+    lastSyncedBlock: (startBlock > 0n ? startBlock - 1n : 0n).toString(),
+    latestKnownBlock: '0',
+    lastSyncStatus: 'idle',
+    lastSyncError: '',
+    updatedAt: new Date(),
+  });
 }
 
 async function fetchDexScreenerSnapshot(tokenAddress: string) {
@@ -490,62 +593,151 @@ async function makeStoredToken(payload: RegisterTokenPayload): Promise<StoredTok
   };
 }
 
-async function syncFactoryLaunchesInternal() {
+function resolvedFactoryStartBlock(latestBlock: bigint) {
+  const blockWindow = envBigInt('EAGLE_SYNC_BLOCK_WINDOW', DEFAULT_SYNC_BLOCK_WINDOW);
+  const startBlockEnv = process.env.EAGLE_FACTORY_START_BLOCK?.trim();
+  if (startBlockEnv) {
+    try {
+      return BigInt(startBlockEnv);
+    } catch {
+      return latestBlock > blockWindow ? latestBlock - blockWindow : 0n;
+    }
+  }
+  return latestBlock > blockWindow ? latestBlock - blockWindow : 0n;
+}
+
+async function syncFactoryLaunchesInternal(options?: { force?: boolean; reset?: boolean }) {
   const rpcUrl = process.env.BSC_RPC_URL?.trim();
   if (!rpcUrl) return;
 
   const now = Date.now();
-  if (now - lastFactorySyncAt < envNumber('TOKEN_SYNC_COOLDOWN_MS', DEFAULT_SYNC_COOLDOWN_MS)) {
+  if (!options?.force && now - lastFactorySyncAt < envNumber('TOKEN_SYNC_COOLDOWN_MS', DEFAULT_SYNC_COOLDOWN_MS)) {
     return;
   }
   lastFactorySyncAt = now;
 
   const client = createPublicClient({ transport: http(rpcUrl) });
   const latestBlock = await client.getBlockNumber();
-  const blockWindow = envBigInt('EAGLE_SYNC_BLOCK_WINDOW', DEFAULT_SYNC_BLOCK_WINDOW);
-  const startBlockEnv = process.env.EAGLE_FACTORY_START_BLOCK?.trim();
-  const fromBlock = startBlockEnv
-    ? BigInt(startBlockEnv)
-    : latestBlock > blockWindow
-      ? latestBlock - blockWindow
-      : 0n;
+  const startBlock = resolvedFactoryStartBlock(latestBlock);
+  const chunkSize = envBigInt('EAGLE_SYNC_CHUNK_SIZE', DEFAULT_SYNC_CHUNK_SIZE);
+  const maxChunksPerRun = envNumber('EAGLE_SYNC_MAX_CHUNKS_PER_RUN', DEFAULT_SYNC_MAX_CHUNKS_PER_RUN);
+  const factoryAddress = normalizeAddress(process.env.EAGLE_FACTORY_ADDRESS?.trim() || DEFAULT_FACTORY_ADDRESS);
 
-  const logs = await client.getLogs({
-    address: normalizeAddress(process.env.EAGLE_FACTORY_ADDRESS?.trim() || DEFAULT_FACTORY_ADDRESS),
-    event: tokenLaunchedEvent,
-    fromBlock,
-    toBlock: latestBlock,
+  const existingState = options?.reset ? null : await readSyncState();
+  if (options?.reset || (existingState && BigInt(existingState.syncStartedFrom) > startBlock)) {
+    await resetSyncState(startBlock);
+  }
+
+  const syncState = (options?.reset ? null : existingState) ?? (await readSyncState());
+  let nextFromBlock = syncState ? BigInt(syncState.lastSyncedBlock) + 1n : startBlock;
+  if (nextFromBlock < startBlock) {
+    nextFromBlock = startBlock;
+  }
+
+  await writeSyncState({
+    key: FACTORY_SYNC_STATE_KEY,
+    syncStartedFrom: startBlock.toString(),
+    lastSyncedBlock: syncState?.lastSyncedBlock ?? (startBlock > 0n ? (startBlock - 1n).toString() : '0'),
+    latestKnownBlock: latestBlock.toString(),
+    lastSyncStatus: nextFromBlock > latestBlock ? 'done' : 'syncing',
+    lastSyncError: '',
+    updatedAt: new Date(),
   });
 
-  for (const log of logs) {
-    const args = log.args;
-    if (!args.token || !args.creator || !args.quoteToken || !args.pool || !args.name || !args.symbol || args.totalSupply === undefined) {
-      continue;
+  if (nextFromBlock > latestBlock) {
+    return;
+  }
+
+  try {
+    let processedChunks = 0;
+    let cursor = nextFromBlock;
+
+    while (cursor <= latestBlock && processedChunks < maxChunksPerRun) {
+      const toBlock = cursor + chunkSize - 1n < latestBlock ? cursor + chunkSize - 1n : latestBlock;
+      const logs = await client.getLogs({
+        address: factoryAddress,
+        event: tokenLaunchedEvent,
+        fromBlock: cursor,
+        toBlock,
+      });
+
+      for (const log of logs) {
+        const args = log.args;
+        if (!args.token || !args.creator || !args.quoteToken || !args.pool || !args.name || !args.symbol || args.totalSupply === undefined) {
+          continue;
+        }
+        const block = await client.getBlock({ blockNumber: log.blockNumber });
+        await registerTokenLaunch({
+          address: args.token,
+          creator: args.creator,
+          poolAddress: args.pool,
+          quoteToken: args.quoteToken,
+          quoteSymbol: quoteSymbolFromAddress(args.quoteToken),
+          name: args.name,
+          symbol: args.symbol,
+          totalSupply: args.totalSupply.toString(),
+          metadataURI: args.metadataURI,
+          feeTier: Number(args.fee),
+          launchedAt: new Date(Number(block.timestamp) * 1000).toISOString(),
+        });
+      }
+
+      await writeSyncState({
+        key: FACTORY_SYNC_STATE_KEY,
+        syncStartedFrom: startBlock.toString(),
+        lastSyncedBlock: toBlock.toString(),
+        latestKnownBlock: latestBlock.toString(),
+        lastSyncStatus: toBlock >= latestBlock ? 'done' : 'syncing',
+        lastSyncError: '',
+        updatedAt: new Date(),
+      });
+
+      cursor = toBlock + 1n;
+      processedChunks += 1;
     }
-    const block = await client.getBlock({ blockNumber: log.blockNumber });
-    await registerTokenLaunch({
-      address: args.token,
-      creator: args.creator,
-      poolAddress: args.pool,
-      quoteToken: args.quoteToken,
-      quoteSymbol: quoteSymbolFromAddress(args.quoteToken),
-      name: args.name,
-      symbol: args.symbol,
-      totalSupply: args.totalSupply.toString(),
-      metadataURI: args.metadataURI,
-      feeTier: Number(args.fee),
-      launchedAt: new Date(Number(block.timestamp) * 1000).toISOString(),
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await writeSyncState({
+      key: FACTORY_SYNC_STATE_KEY,
+      syncStartedFrom: startBlock.toString(),
+      lastSyncedBlock: (nextFromBlock > startBlock ? nextFromBlock - 1n : startBlock > 0n ? startBlock - 1n : 0n).toString(),
+      latestKnownBlock: latestBlock.toString(),
+      lastSyncStatus: 'error',
+      lastSyncError: message,
+      updatedAt: new Date(),
     });
+    throw error;
   }
 }
 
-export async function syncFactoryLaunches() {
+export async function syncFactoryLaunches(options?: { force?: boolean; reset?: boolean }) {
   if (!syncInFlight) {
-    syncInFlight = syncFactoryLaunchesInternal().finally(() => {
+    syncInFlight = syncFactoryLaunchesInternal(options).finally(() => {
       syncInFlight = null;
     });
   }
   return syncInFlight;
+}
+
+export async function getFactorySyncStatus() {
+  const state = await readSyncState();
+  if (!state) {
+    return {
+      key: FACTORY_SYNC_STATE_KEY,
+      syncStartedFrom: '0',
+      lastSyncedBlock: '0',
+      latestKnownBlock: '0',
+      lastSyncStatus: 'idle',
+      lastSyncError: '',
+      updatedAt: new Date(0).toISOString(),
+    } satisfies SyncStatus;
+  }
+  return toSyncStatus(state);
+}
+
+export async function forceFactorySync(options?: { reset?: boolean }) {
+  await syncFactoryLaunches({ force: true, reset: options?.reset });
+  return getFactorySyncStatus();
 }
 
 export async function registerTokenLaunch(payload: RegisterTokenPayload) {

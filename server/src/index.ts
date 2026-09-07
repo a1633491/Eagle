@@ -2,7 +2,15 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import { marketOverview, tokenDetails } from './data/mockData.js';
-import { getMarketOverview, getTokenDetail, getTokenTrades, registerTokenLaunch, type RegisterTokenPayload } from './tokenRegistry.js';
+import {
+  forceFactorySync,
+  getFactorySyncStatus,
+  getMarketOverview,
+  getTokenDetail,
+  getTokenTrades,
+  registerTokenLaunch,
+  type RegisterTokenPayload,
+} from './tokenRegistry.js';
 
 dotenv.config();
 
@@ -60,6 +68,27 @@ app.post('/api/tokens/register', async (request, response) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to register token';
     response.status(400).json(fail(message));
+  }
+});
+
+app.get('/api/tokens/sync-status', async (_request, response) => {
+  try {
+    const status = await getFactorySyncStatus();
+    response.json(ok(status));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to get sync status';
+    response.status(500).json(fail(message, 500));
+  }
+});
+
+app.post('/api/tokens/sync', async (request, response) => {
+  try {
+    const reset = Boolean((request.body as { reset?: boolean } | undefined)?.reset);
+    const status = await forceFactorySync({ reset });
+    response.json(ok(status));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to sync factory launches';
+    response.status(500).json(fail(message, 500));
   }
 });
 
