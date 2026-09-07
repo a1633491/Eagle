@@ -29,7 +29,7 @@ app.get('/api/tokens', async (_request, response) => {
     const overview = await getMarketOverview(marketOverview);
     response.json(ok(overview));
   } catch {
-    response.json(ok(marketOverview));
+    response.json(ok({ ...marketOverview, launchedCount: 0, totalVolume24h: 0, trending: [], tokens: [] }));
   }
 });
 
@@ -38,8 +38,7 @@ app.get('/api/tokens/:address', async (request, response) => {
     const token = await getTokenDetail(request.params.address, tokenDetails);
     response.json(ok(token));
   } catch {
-    const fallback = tokenDetails.find((item) => item.address === request.params.address) ?? tokenDetails[0];
-    response.json(ok(fallback));
+    response.status(404).json(fail('Token not found', 404));
   }
 });
 
@@ -48,8 +47,7 @@ app.get('/api/tokens/:address/trades', async (request, response) => {
     const trades = await getTokenTrades(request.params.address, tokenDetails);
     response.json(ok(trades));
   } catch {
-    const fallback = tokenDetails.find((item) => item.address === request.params.address) ?? tokenDetails[0];
-    response.json(ok(fallback.trades));
+    response.status(404).json(fail('Token not found', 404));
   }
 });
 

@@ -310,60 +310,19 @@ function toTokenRecord(document: StoredTokenDocument): TokenRecord {
   };
 }
 
-function mergeByAddress(primary: TokenRecord[], fallback: TokenRecord[]) {
-  const seen = new Set<string>();
-  const merged: TokenRecord[] = [];
-  for (const item of [...primary, ...fallback]) {
-    const key = item.address.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merged.push(item);
-  }
-  return merged;
-}
-
-function normalizeFallbackToken(token: FallbackToken): TokenRecord {
-  const pairParts = token.pairLabel.split('/').map((item) => item.trim());
-  const launchedAt = new Date(token.launchedDate);
-  return {
-    address: token.address,
-    name: token.name,
-    symbol: token.symbol,
-    quoteToken: token.poolAddress,
-    quoteSymbol: token.quoteSymbol || pairParts[1] || 'TOKEN',
-    priceUsd: token.priceUsd,
-    change24h: token.change24h,
-    marketCap: token.marketCap,
-    volume24h: token.volume24h,
-    liquidity: token.liquidity,
-    holders: token.holders,
-    description: token.description,
-    creator: token.creator,
-    poolAddress: token.poolAddress,
-    official: token.official,
-    tags: token.tags,
-    totalSupply: token.totalSupply,
-    launchedDate: token.launchedDate,
-    launchedAgo: token.launchedAgo,
-    pairLabel: token.pairLabel,
-    chart: token.chart,
-    trades: token.trades,
-    launchedAt: Number.isNaN(launchedAt.getTime()) ? new Date().toISOString() : launchedAt.toISOString(),
-  };
-}
-
 function buildOverview(tokens: TokenRecord[], fallback: FallbackOverview) {
-  const fallbackTokens = fallback.tokens.map(normalizeFallbackToken);
-  const mergedTokens = mergeByAddress(tokens, fallbackTokens);
-  const trending = [...mergedTokens]
+  const sortedTokens = [...tokens].sort((left, right) => {
+    return new Date(right.launchedAt).getTime() - new Date(left.launchedAt).getTime();
+  });
+  const trending = [...sortedTokens]
     .sort((left, right) => right.volume24h + right.marketCap - (left.volume24h + left.marketCap))
-    .slice(0, Math.max(mergedTokens.length, 3));
+    .slice(0, Math.min(sortedTokens.length, 3));
   return {
     chain: fallback.chain,
-    launchedCount: mergedTokens.length,
-    totalVolume24h: mergedTokens.reduce((sum, token) => sum + token.volume24h, 0),
+    launchedCount: sortedTokens.length,
+    totalVolume24h: sortedTokens.reduce((sum, token) => sum + token.volume24h, 0),
     trending,
-    tokens: mergedTokens,
+    tokens: sortedTokens,
   };
 }
 
@@ -621,10 +580,9 @@ export async function getMarketOverview(fallback: FallbackOverview) {
   return overview;
 }
 
-export async function getTokenDetail(address: string, fallbackTokens: FallbackToken[]) {
-  const normalizedFallbackTokens = fallbackTokens.map(normalizeFallbackToken);
+export async function getTokenDetail(address: string, _fallbackTokens: FallbackToken[]) {
   if (!isAddress(address)) {
-    return normalizedFallbackTokens[0];
+    throw new Error('Invalid token address');
   }
 
   await Promise.allSettled([syncFactoryLaunches()]);
@@ -639,10 +597,10 @@ export async function getTokenDetail(address: string, fallbackTokens: FallbackTo
   }
 
   const stored = await readStoredToken(address);
-  const token =
-    stored
-      ? toTokenRecord(stored)
-      : normalizedFallbackTokens.find((item) => item.address.toLowerCase() === address.toLowerCase()) ?? normalizedFallbackTokens[0];
+  if (!stored) {
+    throw new Error('Token not found');
+  }
+  const token = toTokenRecord(stored);
 
   if (redis && token) {
     await redis.set(cacheKey, JSON.stringify(token), {
