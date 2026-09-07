@@ -8,9 +8,10 @@ import { SwapPanel } from '@/components/swap-panel';
 import { TokenChainActions } from '@/components/token-chain-actions';
 import { TokenMarketSections } from '@/components/token-market-sections';
 import { currency, percent, shorten } from '@/lib/format';
-import { eagleContracts, eagleErc20Abi, eagleFactoryAbi } from '@/lib/contracts';
+import { eagleContracts, eagleErc20Abi, eagleFactoryAbi, eagleLiquidityLockerAbi } from '@/lib/contracts';
 import { t, type Lang } from '@/lib/i18n';
 import { type TokenDetail } from '@/lib/types';
+import { useLiveTokenMarket } from '@/lib/use-live-token-market';
 
 function getFallbackQuoteContract(token: TokenDetail) {
   if (token.quoteSymbol === 'WBNB') return eagleContracts.wbnb;
@@ -119,6 +120,17 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
     functionName: 'symbol',
     query: {
       enabled: Boolean(onchainQuoteToken),
+      refetchInterval: 15000,
+    },
+  });
+
+  const { data: quoteDecimalsData } = useReadContract({
+    address: onchainQuoteToken,
+    abi: eagleErc20Abi,
+    functionName: 'decimals',
+    query: {
+      enabled: Boolean(onchainQuoteToken),
+      refetchInterval: 15000,
     },
   });
 
@@ -161,15 +173,37 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
   }, [normalizedToken, onchainLaunchBlock, publicClient]);
 
   const symbol = tokenSymbolData ?? token.symbol;
-  const displayName = tokenNameData ?? token.name;
-  const quoteSymbol = quoteSymbolData ?? token.quoteSymbol;
   const quoteContract = onchainQuoteToken ?? getFallbackQuoteContract(token);
   const poolAddress = onchainPool && onchainPool !== zeroAddress ? onchainPool : token.poolAddress;
   const creatorAddress = onchainCreator && onchainCreator !== zeroAddress ? onchainCreator : token.creator;
+  const { data: creatorClaimableFees } = useReadContract({
+    address: eagleContracts.locker,
+    abi: eagleLiquidityLockerAbi,
+    functionName: 'claimableFees',
+    args: creatorAddress && quoteContract ? [creatorAddress as Address, quoteContract as Address] : undefined,
+    query: {
+      enabled: Boolean(creatorAddress && quoteContract),
+      refetchInterval: 15000,
+    },
+  });
+  const liveMarket = useLiveTokenMarket(token.address, {
+    priceUsd: token.priceUsd,
+    change24h: token.change24h,
+    volume24h: token.volume24h,
+    liquidity: token.liquidity,
+    marketCap: token.marketCap,
+    poolAddress: poolAddress,
+    quoteSymbol: quoteSymbolData ?? token.quoteSymbol,
+  });
+  const displayName = tokenNameData ?? token.name;
+  const quoteSymbol = liveMarket.quoteSymbol ?? quoteSymbolData ?? token.quoteSymbol;
   const launchedAgo = formatRelativeLaunch(launchTimestamp, token.launchedAgo, lang);
   const launchedDate = formatLaunchDate(launchTimestamp, lang, token.launchedDate);
   const pairLabel = `${symbol} / ${quoteSymbol}`;
   const totalSupply = formatSupply(tokenTotalSupplyData, tokenDecimalsData, symbol);
+  const creatorClaimableText = useMemo(() => {
+    return `${formatUnits(creatorClaimableFees ?? BigInt(0), Number(quoteDecimalsData ?? 18))} ${quoteSymbol}`.trim();
+  }, [creatorClaimableFees, quoteDecimalsData, quoteSymbol]);
   const feeTierLabel = useMemo(() => {
     if (onchainFeeTier === undefined) return null;
     return `${Number(onchainFeeTier) / 10000}%`;
@@ -179,6 +213,19 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
     if (feeTierLabel && !nextTags.includes(feeTierLabel)) nextTags.push(feeTierLabel);
     return nextTags;
   }, [feeTierLabel, token.tags]);
+  const liveToken = useMemo(
+    () => ({
+      ...token,
+      priceUsd: liveMarket.priceUsd ?? token.priceUsd,
+      change24h: liveMarket.change24h ?? token.change24h,
+      marketCap: liveMarket.marketCap ?? token.marketCap,
+      volume24h: liveMarket.volume24h ?? token.volume24h,
+      liquidity: liveMarket.liquidity ?? token.liquidity,
+      quoteSymbol,
+      pairLabel,
+    }),
+    [liveMarket.change24h, liveMarket.liquidity, liveMarket.marketCap, liveMarket.priceUsd, liveMarket.volume24h, pairLabel, quoteSymbol, token],
+  );
 
   return (
     <>
@@ -230,26 +277,26 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
             </div>
             <div className='text-right'>
               <p className='text-[13px] text-[#8f9482]'>{t(lang, 'priceUsd')}</p>
-              <p className='mt-1 text-[2rem] font-semibold text-[#f3f1e8]'>{currency(token.priceUsd)}</p>
-              <p className='mt-1 text-[13px] text-[#8fd19e]'>{percent(token.change24h)} 24h</p>
+              <p className='mt-1 text-[2rem] font-semibold text-[#f3f1e8]'>{currency(liveToken.priceUsd)}</p>
+              <p className={`mt-1 text-[13px] ${liveToken.change24h >= 0 ? 'text-[#8fd19e]' : 'text-[#e28989]'}`}>{percent(liveToken.change24h)} 24h</p>
               <p className='mt-1 text-xs text-[#8f9482]'>{t(lang, 'live')}</p>
             </div>
           </div>
           <p className='mt-4 max-w-3xl text-[13px] leading-6 text-[#b6bba9]'>{token.description}</p>
         </div>
         <div className='grid gap-3 md:grid-cols-4'>
-          <MetricCard label={t(lang, 'marketCapLabel')} value={currency(token.marketCap)} />
-          <MetricCard label={t(lang, 'volume24h')} value={currency(token.volume24h)} />
+          <MetricCard label={t(lang, 'marketCapLabel')} value={currency(liveToken.marketCap)} />
+          <MetricCard label={t(lang, 'volume24h')} value={currency(liveToken.volume24h)} />
           <MetricCard label={t(lang, 'holders')} value='—' />
           <MetricCard label={t(lang, 'trades24h')} value='—' />
         </div>
         <div className='rounded-[18px] border border-white/8 bg-[#171916] px-4 py-3 text-sm text-[#9da28f]'>
           {t(lang, 'catchingUp')}
         </div>
-        <TokenMarketSections lang={lang} token={token} />
+        <TokenMarketSections lang={lang} token={liveToken} />
       </section>
       <aside className='space-y-6'>
-        <SwapPanel lang={lang} token={token} />
+        <SwapPanel lang={lang} token={liveToken} creatorClaimableText={creatorClaimableText} />
         <TokenChainActions lang={lang} tokenAddress={token.address} />
         <div className='rounded-[24px] border border-white/8 bg-[#1a1c19]/96 p-5'>
           <h2 className='text-lg font-semibold text-[#f3f1e8]'>{t(lang, 'tokenDetails')}</h2>

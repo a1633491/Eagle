@@ -6,7 +6,15 @@ import { TokenDetail } from '@/lib/types';
 import { currency } from '@/lib/format';
 import { t, type Lang } from '@/lib/i18n';
 
-export function SwapPanel({ lang, token }: { lang: Lang; token: TokenDetail }) {
+export function SwapPanel({
+  lang,
+  token,
+  creatorClaimableText,
+}: {
+  lang: Lang;
+  token: TokenDetail;
+  creatorClaimableText?: string;
+}) {
   const [pay, setPay] = useState('0.00');
   const [slippage] = useState('0.5');
   const [side, setSide] = useState<'Buy' | 'Sell'>('Buy');
@@ -97,8 +105,8 @@ export function SwapPanel({ lang, token }: { lang: Lang; token: TokenDetail }) {
         <p className="text-[#f3f1e8]">{t(lang, 'creatorFees')}</p>
         <p className="mt-2">1% pool fee</p>
         <p className="mt-1">{t(lang, 'uncollectedFees')}</p>
-        <p className="text-[#f3f1e8]">107.3 {token.quoteSymbol}</p>
-        <p className="mt-1 text-xs text-[#8f9482]">{t(lang, 'beforeFeeSplit')}</p>
+        <p className="text-[#f3f1e8]">{creatorClaimableText ?? `0 ${token.quoteSymbol}`}</p>
+        <p className="mt-1 text-xs text-[#8f9482]">{t(lang, 'beforeFeeSplit')} · {t(lang, 'live')}</p>
         <p className="mt-2">{t(lang, 'tokenSideFees')}</p>
         <p className="mt-1">{t(lang, 'creatorCollect')}</p>
       </div>
