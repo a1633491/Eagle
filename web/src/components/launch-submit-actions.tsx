@@ -201,6 +201,37 @@ async function queueAutomaticVerification(payload: {
   }
 }
 
+async function registerLaunchedToken(payload: {
+  address: Address;
+  name: string;
+  symbol: string;
+  description: string;
+  creator: Address;
+  poolAddress: Address;
+  quoteToken: Address;
+  quoteSymbol: string;
+  totalSupply: bigint;
+  metadataURI: string;
+  feeTier: number;
+  launchedAt: string;
+}) {
+  const response = await fetch(`${API_BASE}/tokens/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      ...payload,
+      totalSupply: payload.totalSupply.toString(),
+    }),
+    signal: AbortSignal.timeout(2500),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to register launched token (${response.status})`);
+  }
+}
+
 export function LaunchSubmitActions({
   lang,
   name,
@@ -247,7 +278,17 @@ export function LaunchSubmitActions({
     },
   });
 
+  const { data: customQuoteSymbol } = useReadContract({
+    address: resolvedQuoteToken,
+    abi: eagleErc20Abi,
+    functionName: 'symbol',
+    query: {
+      enabled: pair === 'ANY' && Boolean(resolvedQuoteToken),
+    },
+  });
+
   const quoteDecimals = pair === 'ANY' ? Number(customQuoteDecimals ?? 18) : 18;
+  const resolvedQuoteSymbol = pair === 'BNB' ? 'WBNB' : pair === 'USDT' ? 'USDT' : (customQuoteSymbol ?? 'TOKEN');
   const tickSpacing = tickSpacingByFeeTier[feeTier];
 
   useEffect(() => {
@@ -459,6 +500,34 @@ export function LaunchSubmitActions({
       await publicClient.waitForTransactionReceipt({ hash });
       if (predictedTokenAddress) {
         try {
+          const launchRecord = await publicClient.readContract({
+            address: eagleContracts.factory,
+            abi: eagleFactoryAbi,
+            functionName: 'launches',
+            args: [predictedTokenAddress],
+          });
+          const poolAddress = launchRecord[2];
+          const quoteToken = launchRecord[1];
+          if (poolAddress && quoteToken) {
+            await registerLaunchedToken({
+              address: predictedTokenAddress,
+              name: name.trim(),
+              symbol: ticker.trim(),
+              description: story.trim(),
+              creator: address as Address,
+              poolAddress,
+              quoteToken,
+              quoteSymbol: resolvedQuoteSymbol,
+              totalSupply: parsedTotalSupply,
+              metadataURI: metadataUri,
+              feeTier,
+              launchedAt: new Date().toISOString(),
+            });
+          }
+        } catch {
+          // Token registration is best-effort and should not block launch completion.
+        }
+        try {
           await queueAutomaticVerification({
             address: predictedTokenAddress,
             name: name.trim(),
@@ -491,8 +560,7 @@ export function LaunchSubmitActions({
 
   const primaryAction = approvalSatisfied ? handleLaunch : handleApprove;
   const launchFeeText = formatEther(launchFeeWei ?? defaultLaunchConfig.maxLaunchFeeWeiFallback);
-  const firstBuyText =
-    firstBuyAmount !== undefined ? formatUnits(firstBuyAmount, quoteDecimals) : '0';
+  const firstBuyText = firstBuyAmount !== undefined ? formatUnits(firstBuyAmount, quoteDecimals) : '0';
 
   return (
     <div className='space-y-4'>
