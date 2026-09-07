@@ -5,11 +5,11 @@
   "scripts": {
     "clean": "hardhat clean",
     "compile": "hardhat compile",
-    "deploy:bsc": "hardhat run scripts/deploy.ts --network bsc",
-    "deploy:hardhat": "hardhat run scripts/deploy.ts --network hardhat",
-    "verify:bsc": "hardhat run scripts/verify.ts --network bsc",
-    "verify:token:bsc": "hardhat run scripts/verify-token.ts --network bsc",
-    "set-launch-fee:bsc": "hardhat run scripts/set-launch-fee.ts --network bsc"
+    "deploy:bsc": "hardhat run scripts/deploy.js --network bsc",
+    "deploy:hardhat": "hardhat run scripts/deploy.js --network hardhat",
+    "verify:bsc": "hardhat run scripts/verify.js --network bsc",
+    "verify:token:bsc": "hardhat run scripts/verify-token.js --network bsc",
+    "set-launch-fee:bsc": "hardhat run scripts/set-launch-fee.js --network bsc"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

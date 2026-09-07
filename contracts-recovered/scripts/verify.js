@@ -1,27 +1,13 @@
-import fs from 'fs';
-import path from 'path';
-import hre from 'hardhat';
+const fs = require('fs');
+const path = require('path');
+const hre = require('hardhat');
 
-type VerificationEntry = {
-  address: string;
-  contract: string;
-  constructorArguments: Array<string | number>;
-};
-
-type DeploymentFile = {
-  verification: {
-    eagleFactory: VerificationEntry;
-    eagleLiquidityLocker: VerificationEntry;
-    eagleDistributorFactory: VerificationEntry;
-  };
-};
-
-async function verify(entry: VerificationEntry, label: string) {
+async function verify(entry, label) {
   try {
     await hre.run('verify:verify', {
       address: entry.address,
       contract: entry.contract,
-      constructorArguments: entry.constructorArguments
+      constructorArguments: entry.constructorArguments,
     });
     console.log(`Verified ${label}: ${entry.address}`);
   } catch (error) {
@@ -40,7 +26,7 @@ async function main() {
     throw new Error(`Deployment file not found: ${deploymentFile}`);
   }
 
-  const deployment = JSON.parse(fs.readFileSync(deploymentFile, 'utf8')) as DeploymentFile;
+  const deployment = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
 
   await verify(deployment.verification.eagleFactory, 'EagleFactory');
   await verify(deployment.verification.eagleLiquidityLocker, 'EagleLiquidityLocker');

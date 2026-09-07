@@ -1,17 +1,17 @@
-import fs from 'fs';
-import path from 'path';
-import hre, { ethers } from 'hardhat';
+const fs = require('fs');
+const path = require('path');
+const hre = require('hardhat');
 
-function getFlagValue(flag: string): string | undefined {
+function getFlagValue(flag) {
   const index = process.argv.indexOf(flag);
   if (index === -1) return undefined;
   return process.argv[index + 1];
 }
 
-function resolveFactoryAddress(): string {
+function resolveFactoryAddress() {
   const fromEnv = process.env.EAGLE_FACTORY_ADDRESS?.trim();
   if (fromEnv) {
-    if (!ethers.isAddress(fromEnv)) {
+    if (!hre.ethers.isAddress(fromEnv)) {
       throw new Error(`Invalid EAGLE_FACTORY_ADDRESS: ${fromEnv}`);
     }
     return fromEnv;
@@ -22,11 +22,9 @@ function resolveFactoryAddress(): string {
     throw new Error(`Missing deployment file: ${deploymentFile}`);
   }
 
-  const parsed = JSON.parse(fs.readFileSync(deploymentFile, 'utf8')) as {
-    eagleFactory?: string;
-  };
+  const parsed = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
 
-  if (!parsed.eagleFactory || !ethers.isAddress(parsed.eagleFactory)) {
+  if (!parsed.eagleFactory || !hre.ethers.isAddress(parsed.eagleFactory)) {
     throw new Error(`Invalid eagleFactory address in ${deploymentFile}`);
   }
 
@@ -38,12 +36,12 @@ async function main() {
   const nextFee = BigInt(feeArg);
   const factoryAddress = resolveFactoryAddress();
 
-  const [signer] = await ethers.getSigners();
+  const [signer] = await hre.ethers.getSigners();
   if (!signer) {
     throw new Error('No signer available');
   }
 
-  const eagleFactory = await ethers.getContractAt('EagleFactory', factoryAddress, signer);
+  const eagleFactory = await hre.ethers.getContractAt('EagleFactory', factoryAddress, signer);
   const owner = await eagleFactory.owner();
   const currentFee = await eagleFactory.launchFeeWei();
 

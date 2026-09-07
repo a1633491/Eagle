@@ -1,4 +1,4 @@
-import hre from 'hardhat';
+const hre = require('hardhat');
 
 const CONTRACT_NAME = 'contracts/BrewLaunchSuite.sol:EagleToken';
 const RETRYABLE_PATTERNS = [
@@ -10,7 +10,7 @@ const RETRYABLE_PATTERNS = [
   /Pending in queue/i,
 ];
 
-function requiredEnv(name: string) {
+function requiredEnv(name) {
   const value = process.env[name]?.trim();
   if (!value) {
     throw new Error(`Missing required environment variable: ${name}`);
@@ -18,12 +18,12 @@ function requiredEnv(name: string) {
   return value;
 }
 
-function shouldRetry(error: unknown) {
+function shouldRetry(error) {
   const message = error instanceof Error ? error.message : String(error);
   return RETRYABLE_PATTERNS.some((pattern) => pattern.test(message));
 }
 
-function sleep(ms: number) {
+function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 

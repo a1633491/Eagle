@@ -1,8 +1,8 @@
-import fs from 'fs';
-import path from 'path';
-import hre, { ethers } from 'hardhat';
+const fs = require('fs');
+const path = require('path');
+const hre = require('hardhat');
 
-function requiredEnv(name: string): string {
+function requiredEnv(name) {
   const value = process.env[name];
   if (!value) {
     throw new Error(`Missing required env: ${name}`);
@@ -10,15 +10,15 @@ function requiredEnv(name: string): string {
   return value;
 }
 
-function requiredAddress(name: string): string {
+function requiredAddress(name) {
   const value = requiredEnv(name);
-  if (!ethers.isAddress(value)) {
+  if (!hre.ethers.isAddress(value)) {
     throw new Error(`Invalid address in ${name}: ${value}`);
   }
   return value;
 }
 
-function requiredBigInt(name: string): bigint {
+function requiredBigInt(name) {
   const value = requiredEnv(name);
   try {
     return BigInt(value);
@@ -27,7 +27,7 @@ function requiredBigInt(name: string): bigint {
   }
 }
 
-function requiredNumber(name: string): number {
+function requiredNumber(name) {
   const value = Number(requiredEnv(name));
   if (!Number.isInteger(value)) {
     throw new Error(`Invalid integer in ${name}: ${value}`);
@@ -36,7 +36,7 @@ function requiredNumber(name: string): number {
 }
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
+  const [deployer] = await hre.ethers.getSigners();
   if (!deployer) {
     throw new Error('No deployer account available');
   }
@@ -48,7 +48,7 @@ async function main() {
     owner: requiredAddress('FACTORY_OWNER'),
     treasury: requiredAddress('FACTORY_TREASURY'),
     launchFeeWei: requiredBigInt('LAUNCH_FEE_WEI'),
-    protocolLpFeeBps: requiredNumber('PROTOCOL_LP_FEE_BPS')
+    protocolLpFeeBps: requiredNumber('PROTOCOL_LP_FEE_BPS'),
   };
 
   console.log(`Network: ${hre.network.name}`);
@@ -56,7 +56,7 @@ async function main() {
   console.log(`Factory owner: ${params.owner}`);
   console.log(`Factory treasury: ${params.treasury}`);
 
-  const eagleFactoryFactory = await ethers.getContractFactory('EagleFactory');
+  const eagleFactoryFactory = await hre.ethers.getContractFactory('EagleFactory');
   const eagleFactory = await eagleFactoryFactory.deploy(
     params.pancakeV3Factory,
     params.positionManager,
@@ -64,21 +64,21 @@ async function main() {
     params.owner,
     params.treasury,
     params.launchFeeWei,
-    params.protocolLpFeeBps
+    params.protocolLpFeeBps,
   );
   await eagleFactory.waitForDeployment();
 
   const eagleFactoryAddress = await eagleFactory.getAddress();
   const lockerAddress = await eagleFactory.locker();
 
-  const distributorFactoryFactory = await ethers.getContractFactory('EagleDistributorFactory');
+  const distributorFactoryFactory = await hre.ethers.getContractFactory('EagleDistributorFactory');
   const distributorFactory = await distributorFactoryFactory.deploy(eagleFactoryAddress);
   await distributorFactory.waitForDeployment();
 
   const distributorFactoryAddress = await distributorFactory.getAddress();
   const deployment = {
     network: hre.network.name,
-    chainId: (await ethers.provider.getNetwork()).chainId.toString(),
+    chainId: (await hre.ethers.provider.getNetwork()).chainId.toString(),
     deployer: deployer.address,
     pancakeV3Factory: params.pancakeV3Factory,
     positionManager: params.positionManager,
@@ -101,20 +101,20 @@ async function main() {
           params.owner,
           params.treasury,
           params.launchFeeWei.toString(),
-          params.protocolLpFeeBps
-        ]
+          params.protocolLpFeeBps,
+        ],
       },
       eagleLiquidityLocker: {
         address: lockerAddress,
         contract: 'contracts/BrewLaunchSuite.sol:EagleLiquidityLocker',
-        constructorArguments: [params.positionManager, eagleFactoryAddress]
+        constructorArguments: [params.positionManager, eagleFactoryAddress],
       },
       eagleDistributorFactory: {
         address: distributorFactoryAddress,
         contract: 'contracts/BrewLaunchSuite.sol:EagleDistributorFactory',
-        constructorArguments: [eagleFactoryAddress]
-      }
-    }
+        constructorArguments: [eagleFactoryAddress],
+      },
+    },
   };
 
   const outputDir = path.join(process.cwd(), 'deployments');
