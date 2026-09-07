@@ -16,6 +16,10 @@ app.use(express.json());
 const ok = <T>(data: T) => ({ code: 200, msg: 'success', data });
 const fail = (msg: string, code = 400) => ({ code, msg, data: null });
 
+app.get('/', (_request, response) => {
+  response.json(ok({ service: 'eagle-server', status: 'ok' }));
+});
+
 app.get('/api/health', (_request, response) => {
   response.json(ok({ status: 'ok' }));
 });
@@ -79,6 +83,10 @@ app.post('/api/verify-token', (request, response) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`server running on http://localhost:${port}`);
-});
+if (process.env.VERCEL !== '1') {
+  app.listen(port, () => {
+    console.log(`server running on http://localhost:${port}`);
+  });
+}
+
+export default app;
