@@ -3,12 +3,12 @@ import dotenv from 'dotenv';
 import express from 'express';
 import { marketOverview, tokenDetails } from './data/mockData.js';
 import { getMarketOverview, getTokenDetail, getTokenTrades, registerTokenLaunch, type RegisterTokenPayload } from './tokenRegistry.js';
-import { queueTokenVerification, type VerifyTokenRequest, validateVerifyTokenRequest } from './verification.js';
 
 dotenv.config();
 
 const app = express();
 const port = Number(process.env.PORT ?? 4000);
+const isVercelRuntime = process.env.VERCEL === '1';
 
 app.use(cors());
 app.use(express.json());
@@ -65,9 +65,15 @@ app.post('/api/tokens/register', async (request, response) => {
   }
 });
 
-app.post('/api/verify-token', (request, response) => {
-  const payload = request.body as VerifyTokenRequest;
-  const validationError = validateVerifyTokenRequest(payload);
+app.post('/api/verify-token', async (request, response) => {
+  if (isVercelRuntime) {
+    response.status(501).json(fail('verify-token is not supported on Vercel runtime', 501));
+    return;
+  }
+
+  const verificationModule = await import('./verification.js');
+  const payload = request.body as import('./verification.js').VerifyTokenRequest;
+  const validationError = verificationModule.validateVerifyTokenRequest(payload);
 
   if (validationError) {
     response.status(400).json(fail(validationError));
@@ -75,7 +81,7 @@ app.post('/api/verify-token', (request, response) => {
   }
 
   try {
-    queueTokenVerification(payload);
+    verificationModule.queueTokenVerification(payload);
     response.json(ok({ status: 'queued', address: payload.address }));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to queue verification';
@@ -83,7 +89,7 @@ app.post('/api/verify-token', (request, response) => {
   }
 });
 
-if (process.env.VERCEL !== '1') {
+if (!isVercelRuntime) {
   app.listen(port, () => {
     console.log(`server running on http://localhost:${port}`);
   });
