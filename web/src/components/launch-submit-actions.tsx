@@ -1,0 +1,563 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useAccount, usePublicClient, useReadContract, useWriteContract } from 'wagmi';
+import { type Address, formatEther, formatUnits, isAddress, keccak256, parseUnits, stringToHex, zeroAddress } from 'viem';
+import {
+  defaultLaunchConfig,
+  eagleContracts,
+  eagleDistributorFactoryAbi,
+  eagleErc20Abi,
+  eagleFactoryAbi,
+  tickSpacingByFeeTier,
+} from '@/lib/contracts';
+import { type Lang } from '@/lib/i18n';
+
+type PairKey = 'BNB' | 'USDT' | 'ANY';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api';
+
+type LaunchSubmitActionsProps = {
+  lang: Lang;
+  name: string;
+  ticker: string;
+  story: string;
+  pair: PairKey;
+  feeTarget: 'wallet' | 'holders';
+  firstBuy: string;
+  feeWallet: string;
+  quoteTokenInput: string;
+  totalSupply: string;
+  feeTier: 100 | 500 | 2500 | 10000;
+  initialBuyMinTokensOut: string;
+};
+
+const copy = {
+  zh: {
+    connectWallet: '先连接钱包',
+    launchNow: '发射到链上',
+    approveFirstBuy: '先授权首购资产',
+    saveDraft: '保存草稿',
+    quoteTokenAddress: '配对代币地址',
+    predictedToken: '预计代币地址',
+    distributor: '持有人分发地址',
+    platformFee: '创建费',
+    firstBuyAmount: '首购金额',
+    launchReady: '参数已就绪，可以发射。',
+    walletRequired: '请先连接钱包再发射。',
+    missingFields: '请先填写代币名称、代码和有效的配对代币地址。',
+    holdersPending: '正在计算持有人分发地址，请稍候。',
+    invalidParams: '请检查总供应量和首购保护参数是否有效。',
+    loadingQuotePrice: '正在根据配对币价格计算默认开盘价...',
+    quotePriceUnavailable: '暂时无法获取该配对币价格，当前不能按默认开盘价发射。',
+    waitingApproval: '等待钱包授权首购资产...',
+    approvalSuccess: '授权成功，现在可以发射。',
+    waitingLaunch: '等待钱包确认发射交易...',
+    launchSuccess: '发射成功，正在跳转到代币详情页。',
+    failedPrefix: '交易失败：',
+    customQuoteHint: '输入 BSC 上的任意标准 BEP20 地址。',
+  },
+  en: {
+    connectWallet: 'Connect wallet first',
+    launchNow: 'Launch on-chain',
+    approveFirstBuy: 'Approve first buy asset',
+    saveDraft: 'Save draft',
+    quoteTokenAddress: 'Quote token address',
+    predictedToken: 'Predicted token',
+    distributor: 'Holder distributor',
+    platformFee: 'Launch fee',
+    firstBuyAmount: 'First buy',
+    launchReady: 'Parameters look good. Ready to launch.',
+    walletRequired: 'Connect your wallet before launching.',
+    missingFields: 'Fill in token name, ticker, and a valid quote token address.',
+    holdersPending: 'Calculating holder distributor address...',
+    invalidParams: 'Check total supply and first buy protection values.',
+    loadingQuotePrice: 'Calculating the default starting price from the quote token...',
+    quotePriceUnavailable: 'A usable USD price for this quote token is unavailable right now.',
+    waitingApproval: 'Waiting for wallet approval...',
+    approvalSuccess: 'Approval confirmed. You can launch now.',
+    waitingLaunch: 'Waiting for wallet confirmation...',
+    launchSuccess: 'Launch confirmed. Redirecting to token page.',
+    failedPrefix: 'Transaction failed: ',
+    customQuoteHint: 'Enter any standard BEP20 token address on BSC.',
+  },
+  ja: {
+    connectWallet: '先にウォレットを接続',
+    launchNow: 'オンチェーンでローンチ',
+    approveFirstBuy: '初回購入資産を承認',
+    saveDraft: '下書きを保存',
+    quoteTokenAddress: 'ペアトークンアドレス',
+    predictedToken: '予定トークンアドレス',
+    distributor: '保有者分配アドレス',
+    platformFee: '作成手数料',
+    firstBuyAmount: '初回購入',
+    launchReady: 'パラメータは問題ありません。ローンチ可能です。',
+    walletRequired: 'ローンチ前にウォレットを接続してください。',
+    missingFields: 'トークン名、ティッカー、有効なペアトークンアドレスを入力してください。',
+    holdersPending: '保有者分配アドレスを計算しています...',
+    invalidParams: '総供給量と初回購入保護の値を確認してください。',
+    loadingQuotePrice: 'ペアトークン価格からデフォルト開始価格を計算しています...',
+    quotePriceUnavailable: 'このペアトークンの価格を取得できないため、現在はローンチできません。',
+    waitingApproval: 'ウォレット承認を待っています...',
+    approvalSuccess: '承認完了。ローンチできます。',
+    waitingLaunch: 'ウォレット確認を待っています...',
+    launchSuccess: 'ローンチ完了。トークンページへ移動します。',
+    failedPrefix: '取引失敗: ',
+    customQuoteHint: 'BSC 上の標準 BEP20 アドレスを入力してください。',
+  },
+} as const;
+
+function normalizeError(error: unknown, prefix: string) {
+  if (error instanceof Error && error.message) {
+    return `${prefix}${error.message}`;
+  }
+  return `${prefix}Unknown error`;
+}
+
+async function fetchQuoteUsdPrice(token: Address) {
+  const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${token}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch quote price (${response.status})`);
+  }
+
+  const payload = (await response.json()) as {
+    pairs?: Array<{
+      chainId?: string;
+      priceUsd?: string;
+      priceNative?: string;
+      liquidity?: { usd?: number };
+      baseToken?: { address?: string };
+      quoteToken?: { address?: string };
+    }>;
+  };
+
+  const normalizedToken = token.toLowerCase();
+  let bestUsdPrice: number | undefined;
+  let bestLiquidity = -1;
+
+  for (const pair of payload.pairs ?? []) {
+    if (pair.chainId !== 'bsc') continue;
+    const baseAddress = pair.baseToken?.address?.toLowerCase();
+    const quoteAddress = pair.quoteToken?.address?.toLowerCase();
+    const pairLiquidity = Number(pair.liquidity?.usd ?? 0);
+    let derivedUsdPrice: number | undefined;
+
+    if (baseAddress === normalizedToken) {
+      const usdPrice = Number(pair.priceUsd);
+      if (Number.isFinite(usdPrice) && usdPrice > 0) {
+        derivedUsdPrice = usdPrice;
+      }
+    } else if (quoteAddress === normalizedToken) {
+      const baseUsdPrice = Number(pair.priceUsd);
+      const basePriceInQuote = Number(pair.priceNative);
+      if (Number.isFinite(baseUsdPrice) && baseUsdPrice > 0 && Number.isFinite(basePriceInQuote) && basePriceInQuote > 0) {
+        derivedUsdPrice = baseUsdPrice / basePriceInQuote;
+      }
+    }
+
+    if (derivedUsdPrice !== undefined && pairLiquidity > bestLiquidity) {
+      bestUsdPrice = derivedUsdPrice;
+      bestLiquidity = pairLiquidity;
+    }
+  }
+
+  if (bestUsdPrice === undefined) {
+    throw new Error('No usable USD price found for quote token');
+  }
+
+  return bestUsdPrice;
+}
+
+function alignInitialTick(targetTokenUsdPrice: number, quoteTokenUsdPrice: number, tickSpacing: number) {
+  const priceInQuote = targetTokenUsdPrice / quoteTokenUsdPrice;
+  const rawTick = Math.log(priceInQuote) / Math.log(1.0001);
+  const alignedTick = Math.round(rawTick / tickSpacing) * tickSpacing;
+  return Math.max(-887200, Math.min(887200, alignedTick));
+}
+
+async function queueAutomaticVerification(payload: {
+  address: Address;
+  name: string;
+  symbol: string;
+  totalSupply: bigint;
+  factoryAddress: Address;
+  metadataURI: string;
+  creator: Address;
+}) {
+  const response = await fetch(`${API_BASE}/verify-token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      ...payload,
+      totalSupply: payload.totalSupply.toString(),
+    }),
+    signal: AbortSignal.timeout(2500),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to queue token verification (${response.status})`);
+  }
+}
+
+export function LaunchSubmitActions({
+  lang,
+  name,
+  ticker,
+  story,
+  pair,
+  feeTarget,
+  firstBuy,
+  feeWallet,
+  quoteTokenInput,
+  totalSupply,
+  feeTier,
+  initialBuyMinTokensOut,
+}: LaunchSubmitActionsProps) {
+  const locale = copy[lang];
+  const router = useRouter();
+  const publicClient = usePublicClient();
+  const { address, isConnected } = useAccount();
+  const { writeContractAsync } = useWriteContract();
+  const [isBusy, setIsBusy] = useState(false);
+  const [status, setStatus] = useState('');
+  const [salt] = useState(() => keccak256(stringToHex(`${Date.now()}-${Math.random()}`)));
+  const [quoteUsdPrice, setQuoteUsdPrice] = useState<number>();
+  const [quotePriceLoading, setQuotePriceLoading] = useState(false);
+
+  const resolvedQuoteToken = useMemo<Address | undefined>(() => {
+    if (pair === 'BNB') return eagleContracts.wbnb;
+    if (pair === 'USDT') return eagleContracts.usdt;
+    return isAddress(quoteTokenInput) ? (quoteTokenInput as Address) : undefined;
+  }, [pair, quoteTokenInput]);
+
+  const { data: launchFeeWei } = useReadContract({
+    address: eagleContracts.factory,
+    abi: eagleFactoryAbi,
+    functionName: 'launchFeeWei',
+  });
+
+  const { data: customQuoteDecimals } = useReadContract({
+    address: resolvedQuoteToken,
+    abi: eagleErc20Abi,
+    functionName: 'decimals',
+    query: {
+      enabled: pair === 'ANY' && Boolean(resolvedQuoteToken),
+    },
+  });
+
+  const quoteDecimals = pair === 'ANY' ? Number(customQuoteDecimals ?? 18) : 18;
+  const tickSpacing = tickSpacingByFeeTier[feeTier];
+
+  useEffect(() => {
+    if (!resolvedQuoteToken) {
+      setQuoteUsdPrice(undefined);
+      setQuotePriceLoading(false);
+      return;
+    }
+
+    const quoteToken = resolvedQuoteToken;
+    let cancelled = false;
+
+    async function loadQuoteUsdPrice() {
+      try {
+        setQuotePriceLoading(true);
+        const usdPrice = await fetchQuoteUsdPrice(quoteToken);
+        if (!cancelled) {
+          setQuoteUsdPrice(usdPrice);
+        }
+      } catch {
+        if (!cancelled) {
+          setQuoteUsdPrice(undefined);
+        }
+      } finally {
+        if (!cancelled) {
+          setQuotePriceLoading(false);
+        }
+      }
+    }
+
+    loadQuoteUsdPrice();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resolvedQuoteToken]);
+
+  const firstBuyAmount = useMemo(() => {
+    try {
+      return firstBuy && Number(firstBuy) > 0 ? parseUnits(firstBuy, quoteDecimals) : BigInt(0);
+    } catch {
+      return undefined;
+    }
+  }, [firstBuy, quoteDecimals]);
+
+  const parsedTotalSupply = useMemo(() => {
+    try {
+      return totalSupply ? parseUnits(totalSupply, 18) : undefined;
+    } catch {
+      return undefined;
+    }
+  }, [totalSupply]);
+
+  const parsedInitialTick = useMemo(() => {
+    if (!quoteUsdPrice || quoteUsdPrice <= 0) return undefined;
+    return alignInitialTick(defaultLaunchConfig.targetLaunchPriceUsd, quoteUsdPrice, tickSpacing);
+  }, [quoteUsdPrice, tickSpacing]);
+
+  const parsedInitialBuyMinTokensOut = useMemo(() => {
+    try {
+      return initialBuyMinTokensOut ? parseUnits(initialBuyMinTokensOut, 18) : BigInt(0);
+    } catch {
+      return undefined;
+    }
+  }, [initialBuyMinTokensOut]);
+
+  const tickAligned = parsedInitialTick !== undefined && parsedInitialTick % tickSpacing === 0;
+
+  const metadataUri = useMemo(() => {
+    const payload = JSON.stringify({
+      name: name.trim(),
+      symbol: ticker.trim(),
+      description: story.trim(),
+    });
+    return `data:application/json,${encodeURIComponent(payload)}`;
+  }, [name, story, ticker]);
+
+  const readyForPrediction = Boolean(address && name.trim() && ticker.trim());
+
+  const { data: predictedTokenAddress } = useReadContract({
+    address: eagleContracts.factory,
+    abi: eagleFactoryAbi,
+    functionName: 'predictTokenAddress',
+    args: readyForPrediction
+      ? [
+          address as Address,
+          salt,
+          name.trim(),
+          ticker.trim(),
+          parsedTotalSupply ?? defaultLaunchConfig.totalSupply,
+          metadataUri,
+        ]
+      : undefined,
+    query: {
+      enabled: readyForPrediction && Boolean(parsedTotalSupply),
+    },
+  });
+
+  const { data: predictedDistributorAddress } = useReadContract({
+    address: eagleContracts.distributorFactory,
+    abi: eagleDistributorFactoryAbi,
+    functionName: 'predict',
+    args: predictedTokenAddress ? [predictedTokenAddress] : undefined,
+    query: {
+      enabled: Boolean(predictedTokenAddress),
+    },
+  });
+
+  const needsApproval = pair !== 'BNB' && Boolean(firstBuyAmount && firstBuyAmount > BigInt(0));
+
+  const { data: currentAllowance } = useReadContract({
+    address: resolvedQuoteToken,
+    abi: eagleErc20Abi,
+    functionName: 'allowance',
+    args: address && resolvedQuoteToken ? [address, eagleContracts.factory] : undefined,
+    query: {
+      enabled: Boolean(address && resolvedQuoteToken && needsApproval),
+    },
+  });
+
+  const approvalSatisfied = !needsApproval || Boolean(currentAllowance && firstBuyAmount !== undefined && currentAllowance >= firstBuyAmount);
+
+  const creatorFeeRecipient = useMemo<Address>(() => {
+    if (feeTarget === 'holders') {
+      return predictedDistributorAddress ?? zeroAddress;
+    }
+    if (isAddress(feeWallet)) {
+      return feeWallet as Address;
+    }
+    return zeroAddress;
+  }, [feeTarget, feeWallet, predictedDistributorAddress]);
+
+  const canLaunch =
+    isConnected &&
+    Boolean(address) &&
+    Boolean(name.trim()) &&
+    Boolean(ticker.trim()) &&
+    Boolean(resolvedQuoteToken) &&
+    firstBuyAmount !== undefined &&
+    parsedTotalSupply !== undefined &&
+    parsedInitialTick !== undefined &&
+    parsedInitialBuyMinTokensOut !== undefined &&
+    !quotePriceLoading &&
+    tickAligned &&
+    (feeTarget !== 'holders' || Boolean(predictedDistributorAddress)) &&
+    approvalSatisfied;
+
+  async function handleApprove() {
+    if (!resolvedQuoteToken || !firstBuyAmount || firstBuyAmount <= BigInt(0) || !publicClient) return;
+    try {
+      setIsBusy(true);
+      setStatus(locale.waitingApproval);
+      const hash = await writeContractAsync({
+        address: resolvedQuoteToken,
+        abi: eagleErc20Abi,
+        functionName: 'approve',
+        args: [eagleContracts.factory, firstBuyAmount],
+      });
+      await publicClient.waitForTransactionReceipt({ hash });
+      setStatus(locale.approvalSuccess);
+    } catch (error) {
+      setStatus(normalizeError(error, locale.failedPrefix));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleLaunch() {
+    if (
+      !address ||
+      !resolvedQuoteToken ||
+      firstBuyAmount === undefined ||
+      parsedTotalSupply === undefined ||
+      parsedInitialTick === undefined ||
+      parsedInitialBuyMinTokensOut === undefined ||
+      !tickAligned ||
+      !publicClient
+    ) {
+      return;
+    }
+    try {
+      setIsBusy(true);
+      setStatus(locale.waitingLaunch);
+      const effectiveLaunchFee = launchFeeWei ?? defaultLaunchConfig.maxLaunchFeeWeiFallback;
+      const hash = await writeContractAsync({
+        address: eagleContracts.factory,
+        abi: eagleFactoryAbi,
+        functionName: 'launch',
+        args: [
+          {
+            name: name.trim(),
+            symbol: ticker.trim(),
+            metadataURI: metadataUri,
+            totalSupply: parsedTotalSupply,
+            quoteToken: resolvedQuoteToken,
+            fee: feeTier,
+            initialTick: parsedInitialTick,
+            positions: [],
+            creatorFeeRecipient,
+            initialBuyQuoteAmount: firstBuyAmount,
+            initialBuyMinTokensOut: parsedInitialBuyMinTokensOut,
+            initialBuyRecipient: zeroAddress,
+            salt,
+            maxLaunchFeeWei: effectiveLaunchFee,
+          },
+        ],
+        value: effectiveLaunchFee + (pair === 'BNB' ? firstBuyAmount : BigInt(0)),
+      });
+      await publicClient.waitForTransactionReceipt({ hash });
+      if (predictedTokenAddress) {
+        try {
+          await queueAutomaticVerification({
+            address: predictedTokenAddress,
+            name: name.trim(),
+            symbol: ticker.trim(),
+            totalSupply: parsedTotalSupply,
+            factoryAddress: eagleContracts.factory,
+            metadataURI: metadataUri,
+            creator: address as Address,
+          });
+        } catch {
+          // Best-effort queueing; launch success should not be blocked by explorer delays.
+        }
+      }
+      setStatus(locale.launchSuccess);
+      if (predictedTokenAddress) {
+        router.push(`/token?address=${predictedTokenAddress}&lang=${lang}`);
+      }
+    } catch (error) {
+      setStatus(normalizeError(error, locale.failedPrefix));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  const primaryLabel = !isConnected
+    ? locale.connectWallet
+    : !approvalSatisfied
+      ? locale.approveFirstBuy
+      : locale.launchNow;
+
+  const primaryAction = approvalSatisfied ? handleLaunch : handleApprove;
+  const launchFeeText = formatEther(launchFeeWei ?? defaultLaunchConfig.maxLaunchFeeWeiFallback);
+  const firstBuyText =
+    firstBuyAmount !== undefined ? formatUnits(firstBuyAmount, quoteDecimals) : '0';
+
+  return (
+    <div className='space-y-4'>
+      <div className='grid gap-3 rounded-[14px] border border-white/8 bg-[#171916] p-3 text-sm'>
+        <div className='flex items-center justify-between gap-4'>
+          <span className='text-[#8f9482]'>{locale.platformFee}</span>
+          <span className='text-[#f3f1e8]'>{launchFeeText} BNB</span>
+        </div>
+        <div className='flex items-center justify-between gap-4'>
+          <span className='text-[#8f9482]'>Default start</span>
+          <span className='text-[#f3f1e8]'>${defaultLaunchConfig.targetLaunchPriceUsd}</span>
+        </div>
+        <div className='flex items-center justify-between gap-4'>
+          <span className='text-[#8f9482]'>{locale.firstBuyAmount}</span>
+          <span className='text-[#f3f1e8]'>{firstBuyText}</span>
+        </div>
+        <div className='flex items-center justify-between gap-4'>
+          <span className='text-[#8f9482]'>{locale.quoteTokenAddress}</span>
+          <span className='max-w-[60%] truncate text-right text-[#f3f1e8]'>
+            {resolvedQuoteToken ?? (pair === 'ANY' ? locale.customQuoteHint : '—')}
+          </span>
+        </div>
+        <div className='flex items-center justify-between gap-4'>
+          <span className='text-[#8f9482]'>{locale.predictedToken}</span>
+          <span className='max-w-[60%] truncate text-right text-[#f3f1e8]'>{predictedTokenAddress ?? '—'}</span>
+        </div>
+        {feeTarget === 'holders' ? (
+          <div className='flex items-center justify-between gap-4'>
+            <span className='text-[#8f9482]'>{locale.distributor}</span>
+            <span className='max-w-[60%] truncate text-right text-[#f3f1e8]'>{predictedDistributorAddress ?? '—'}</span>
+          </div>
+        ) : null}
+      </div>
+      <p className='text-sm leading-7 text-[#8f9482]'>
+        {!isConnected
+          ? locale.walletRequired
+          : !name.trim() || !ticker.trim() || !resolvedQuoteToken || firstBuyAmount === undefined
+            ? locale.missingFields
+            : quotePriceLoading
+              ? locale.loadingQuotePrice
+              : quoteUsdPrice === undefined
+                ? locale.quotePriceUnavailable
+            : parsedTotalSupply === undefined || parsedInitialTick === undefined || parsedInitialBuyMinTokensOut === undefined || !tickAligned
+              ? locale.invalidParams
+            : feeTarget === 'holders' && !predictedDistributorAddress
+              ? locale.holdersPending
+              : locale.launchReady}
+      </p>
+      {status ? <p className='text-sm text-[#d8c483]'>{status}</p> : null}
+      <div className='flex flex-wrap items-center gap-3'>
+        <button
+          type='button'
+          onClick={primaryAction}
+          disabled={!canLaunch || isBusy}
+          className='inline-flex h-11 items-center rounded-full border border-[#f6e3ac66] bg-[linear-gradient(145deg,#f7e8ba,#d1b773)] px-5 text-sm font-medium text-[#342d1a] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60'
+        >
+          {isBusy ? '...' : primaryLabel}
+        </button>
+        <button
+          type='button'
+          className='inline-flex h-11 items-center rounded-full border border-white/10 bg-transparent px-5 text-sm font-medium text-[#c5c9bc] transition hover:bg-white/[0.04]'
+        >
+          {locale.saveDraft}
+        </button>
+      </div>
+    </div>
+  );
+}

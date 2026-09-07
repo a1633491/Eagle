@@ -1,0 +1,85 @@
+@import 'tailwindcss';
+
+:root {
+  --background: #151714;
+  --foreground: #f3f1e8;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: #151714;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, rgba(231, 210, 152, 0.06), transparent 34%),
+    #151714;
+  color: #f3f1e8;
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  line-height: 1.45;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (max-width: 768px) {
+  body {
+    padding-bottom: 6.5rem;
+  }
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: rgba(232, 206, 131, 0.22);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+.button.primary {
+  border: 1px solid rgba(248, 220, 211, 0.36);
+  background: #dca59d;
+  color: #fff7f3;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 1px 0 rgba(0, 0, 0, 0.18);
+}
+
+.button.primary:hover {
+  border-color: rgba(252, 228, 219, 0.48);
+  background: #e2aea6;
+  color: #fffaf7;
+}
+
+.launch-create-button {
+  height: 2.5rem;
+  flex-shrink: 0;
+  padding: 0 1rem;
+}

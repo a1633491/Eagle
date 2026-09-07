@@ -1,0 +1,22 @@
+{
+  "name": "eagle-contracts-recovered",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "clean": "hardhat clean",
+    "compile": "hardhat compile",
+    "deploy:bsc": "hardhat run scripts/deploy.ts --network bsc",
+    "deploy:hardhat": "hardhat run scripts/deploy.ts --network hardhat",
+    "verify:bsc": "hardhat run scripts/verify.ts --network bsc",
+    "verify:token:bsc": "hardhat run scripts/verify-token.ts --network bsc",
+    "set-launch-fee:bsc": "hardhat run scripts/set-launch-fee.ts --network bsc"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/node": "^24.3.0",
+    "dotenv": "^16.6.1",
+    "hardhat": "^2.22.16",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}
