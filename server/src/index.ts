@@ -41,36 +41,6 @@ app.get('/api/tokens', async (_request, response) => {
   }
 });
 
-app.get('/api/tokens/:address', async (request, response) => {
-  try {
-    const token = await getTokenDetail(request.params.address, tokenDetails);
-    response.json(ok(token));
-  } catch {
-    response.status(404).json(fail('Token not found', 404));
-  }
-});
-
-app.get('/api/tokens/:address/trades', async (request, response) => {
-  try {
-    const trades = await getTokenTrades(request.params.address, tokenDetails);
-    response.json(ok(trades));
-  } catch {
-    response.status(404).json(fail('Token not found', 404));
-  }
-});
-
-app.post('/api/tokens/register', async (request, response) => {
-  const payload = request.body as RegisterTokenPayload;
-
-  try {
-    const token = await registerTokenLaunch(payload);
-    response.json(ok(token));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to register token';
-    response.status(400).json(fail(message));
-  }
-});
-
 app.get('/api/tokens/sync-status', async (_request, response) => {
   try {
     const status = await getFactorySyncStatus();
@@ -89,6 +59,36 @@ app.post('/api/tokens/sync', async (request, response) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to sync factory launches';
     response.status(500).json(fail(message, 500));
+  }
+});
+
+app.post('/api/tokens/register', async (request, response) => {
+  const payload = request.body as RegisterTokenPayload;
+
+  try {
+    const token = await registerTokenLaunch(payload);
+    response.json(ok(token));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to register token';
+    response.status(400).json(fail(message));
+  }
+});
+
+app.get('/api/tokens/:address', async (request, response) => {
+  try {
+    const token = await getTokenDetail(request.params.address, tokenDetails);
+    response.json(ok(token));
+  } catch {
+    response.status(404).json(fail('Token not found', 404));
+  }
+});
+
+app.get('/api/tokens/:address/trades', async (request, response) => {
+  try {
+    const trades = await getTokenTrades(request.params.address, tokenDetails);
+    response.json(ok(trades));
+  } catch {
+    response.status(404).json(fail('Token not found', 404));
   }
 });
 
