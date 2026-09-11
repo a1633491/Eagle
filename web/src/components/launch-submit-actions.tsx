@@ -32,6 +32,7 @@ type LaunchSubmitActionsProps = {
   name: string;
   ticker: string;
   story: string;
+  imageDataUrl: string;
   pair: PairKey;
   feeTarget: 'wallet' | 'holders';
   firstBuy: string;
@@ -273,6 +274,7 @@ export function LaunchSubmitActions({
   name,
   ticker,
   story,
+  imageDataUrl,
   pair,
   feeTarget,
   firstBuy,
@@ -398,9 +400,10 @@ export function LaunchSubmitActions({
       name: name.trim(),
       symbol: ticker.trim(),
       description: story.trim(),
+      image: imageDataUrl || undefined,
     });
     return `data:application/json,${encodeURIComponent(payload)}`;
-  }, [name, story, ticker]);
+  }, [imageDataUrl, name, story, ticker]);
 
   const readyForPrediction = Boolean(address && name.trim() && ticker.trim());
 

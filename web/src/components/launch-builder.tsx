@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Globe, ImagePlus, Plus, Search, Triangle } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { LaunchSubmitActions } from '@/components/launch-submit-actions';
 import { t, withLang, type Lang } from '@/lib/i18n';
 
@@ -109,9 +109,13 @@ const copy = {
 } as const;
 
 export function LaunchBuilder({ lang }: { lang: Lang }) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState('');
   const [ticker, setTicker] = useState('');
   const [story, setStory] = useState('');
+  const [imageDataUrl, setImageDataUrl] = useState('');
+  const [imageFileName, setImageFileName] = useState('');
+  const [imageError, setImageError] = useState('');
   const [pair, setPair] = useState<(typeof pairOptions)[number]['key']>('BNB');
   const [feeTarget, setFeeTarget] = useState<'wallet' | 'holders'>('wallet');
   const [firstBuy, setFirstBuy] = useState('0.00');
@@ -135,6 +139,35 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
     label: option.key === 'ANY' ? t(lang, 'anyBscToken') : option.label,
     subtitle: option.key === 'BNB' ? locale.native : option.key === 'USDT' ? locale.stable : option.subtitle,
   }));
+
+  function readImageFile(file: File) {
+    if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type)) {
+      setImageError('仅支持 PNG、JPG、GIF、WebP');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError('图片不能超过 5 MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      setImageDataUrl(result);
+      setImageFileName(file.name);
+      setImageError('');
+    };
+    reader.onerror = () => {
+      setImageError('图片读取失败，请重试');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    readImageFile(file);
+  }
 
   return (
     <div className='grid gap-6 lg:grid-cols-[minmax(0,1fr)_390px]'>
@@ -183,23 +216,41 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
               <label className='mb-2 block text-sm font-medium text-[#f3f1e8]'>{t(lang, 'addTokenImage')}</label>
               <div className='rounded-[22px] border border-dashed border-white/12 bg-[#131512] p-5'>
                 <div className='flex items-center gap-3'>
-                  <div className='flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[#d8c483]'>
-                    <ImagePlus className='h-5 w-5' />
-                  </div>
+                  {imageDataUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={imageDataUrl}
+                      alt='Token preview'
+                      className='h-12 w-12 rounded-full border border-white/10 object-cover'
+                    />
+                  ) : (
+                    <div className='flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[#d8c483]'>
+                      <ImagePlus className='h-5 w-5' />
+                    </div>
+                  )}
                   <div>
                     <p className='text-sm text-[#f3f1e8]'>{t(lang, 'dropItHere')}</p>
                     <p className='mt-1 text-xs text-[#8f9482]'>{locale.imageFormats}</p>
                   </div>
                 </div>
+                <input
+                  ref={fileInputRef}
+                  type='file'
+                  accept='image/png,image/jpeg,image/gif,image/webp'
+                  onChange={handleImageChange}
+                  className='hidden'
+                />
                 <div className='mt-4 flex flex-wrap items-center gap-3'>
                   <button
                     type='button'
+                    onClick={() => fileInputRef.current?.click()}
                     className='inline-flex h-10 items-center rounded-full border border-white/10 bg-white/[0.04] px-4 text-sm text-[#f1e4b7] transition hover:bg-white/[0.06]'
                   >
                     {t(lang, 'chooseFile')}
                   </button>
-                  <span className='text-xs text-[#8f9482]'>{t(lang, 'noFileChosen')}</span>
+                  <span className='text-xs text-[#8f9482]'>{imageFileName || t(lang, 'noFileChosen')}</span>
                 </div>
+                {imageError ? <p className='mt-3 text-xs text-[#f87171]'>{imageError}</p> : null}
               </div>
             </div>
 
@@ -423,6 +474,7 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
               name={name}
               ticker={ticker}
               story={story}
+          imageDataUrl={imageDataUrl}
               pair={pair}
               feeTarget={feeTarget}
               firstBuy={firstBuy}
