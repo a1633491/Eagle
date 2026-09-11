@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { useAccount, usePublicClient, useReadContract, useWriteContract } from 'wagmi';
+import { useAccount, usePublicClient, useReadContract, useSwitchChain, useWriteContract } from 'wagmi';
 import {
   type Address,
   formatEther,
@@ -52,6 +52,7 @@ type LaunchSubmitActionsProps = {
 const copy = {
   zh: {
     connectWallet: '先连接钱包',
+    switchNetwork: '切换到目标网络',
     launchNow: '发射到链上',
     approveFirstBuy: '先授权首购资产',
     saveDraft: '保存草稿',
@@ -69,6 +70,8 @@ const copy = {
     loadingQuotePrice: '正在根据配对币价格计算默认开盘价...',
     quotePriceUnavailable: '暂时无法获取该配对币价格，当前不能按默认开盘价发射。',
     waitingApproval: '等待钱包授权首购资产...',
+    switchingNetwork: '正在切换钱包网络...',
+    switchNetworkFirst: '请先把钱包切到当前选择的链。',
     approvalSuccess: '授权成功，现在可以发射。',
     waitingLaunch: '等待钱包确认发射交易...',
     launchSuccess: '发射成功，正在跳转到代币详情页。',
@@ -77,6 +80,7 @@ const copy = {
   },
   en: {
     connectWallet: 'Connect wallet first',
+    switchNetwork: 'Switch network',
     launchNow: 'Launch on-chain',
     approveFirstBuy: 'Approve first buy asset',
     saveDraft: 'Save draft',
@@ -94,6 +98,8 @@ const copy = {
     loadingQuotePrice: 'Calculating the default starting price from the quote token...',
     quotePriceUnavailable: 'A usable USD price for this quote token is unavailable right now.',
     waitingApproval: 'Waiting for wallet approval...',
+    switchingNetwork: 'Switching wallet network...',
+    switchNetworkFirst: 'Switch your wallet to the selected network first.',
     approvalSuccess: 'Approval confirmed. You can launch now.',
     waitingLaunch: 'Waiting for wallet confirmation...',
     launchSuccess: 'Launch confirmed. Redirecting to token page.',
@@ -102,6 +108,7 @@ const copy = {
   },
   ja: {
     connectWallet: '先にウォレットを接続',
+    switchNetwork: 'ネットワークを切り替え',
     launchNow: 'オンチェーンでローンチ',
     approveFirstBuy: '初回購入資産を承認',
     saveDraft: '下書きを保存',
@@ -119,6 +126,8 @@ const copy = {
     loadingQuotePrice: 'ペアトークン価格からデフォルト開始価格を計算しています...',
     quotePriceUnavailable: 'このペアトークンの価格を取得できないため、現在はローンチできません。',
     waitingApproval: 'ウォレット承認を待っています...',
+    switchingNetwork: 'ウォレットのネットワークを切り替えています...',
+    switchNetworkFirst: '先にウォレットを選択中のネットワークへ切り替えてください。',
     approvalSuccess: '承認完了。ローンチできます。',
     waitingLaunch: 'ウォレット確認を待っています...',
     launchSuccess: 'ローンチ完了。トークンページへ移動します。',
@@ -304,7 +313,8 @@ export function LaunchSubmitActions({
   const contracts = getEagleContracts(chainKey);
   const router = useRouter();
   const publicClient = usePublicClient();
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId: walletChainId } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
   const [isBusy, setIsBusy] = useState(false);
   const [status, setStatus] = useState('');
@@ -488,6 +498,8 @@ export function LaunchSubmitActions({
     return zeroAddress;
   }, [feeTarget, feeWallet, predictedDistributorAddress]);
 
+  const isWrongNetwork = isConnected && walletChainId !== undefined && walletChainId !== chain.chainId;
+
   const formReady =
     isConnected &&
     Boolean(address) &&
@@ -505,8 +517,25 @@ export function LaunchSubmitActions({
     tickAligned &&
     (feeTarget !== 'holders' || Boolean(predictedDistributorAddress));
 
-  const canLaunch = formReady && approvalSatisfied;
-  const canApprove = formReady && needsApproval && !approvalSatisfied;
+  const canLaunch = formReady && approvalSatisfied && !isWrongNetwork;
+  const canApprove = formReady && needsApproval && !approvalSatisfied && !isWrongNetwork;
+
+  async function handleSwitchNetwork() {
+    if (!switchChainAsync) {
+      setStatus(locale.switchNetworkFirst);
+      return;
+    }
+    try {
+      setIsBusy(true);
+      setStatus(locale.switchingNetwork);
+      await switchChainAsync({ chainId: chain.chainId });
+      setStatus('');
+    } catch (error) {
+      setStatus(normalizeError(error, locale.failedPrefix));
+    } finally {
+      setIsBusy(false);
+    }
+  }
 
   async function handleApprove() {
     if (!resolvedQuoteToken || !firstBuyAmount || firstBuyAmount <= BigInt(0) || !publicClient || !contracts.factory) return;
@@ -651,11 +680,13 @@ export function LaunchSubmitActions({
 
   const primaryLabel = !isConnected
     ? locale.connectWallet
+    : isWrongNetwork
+      ? `${locale.switchNetwork} ${chain.name}`
     : !approvalSatisfied
       ? locale.approveFirstBuy
       : locale.launchNow;
 
-  const primaryAction = approvalSatisfied ? handleLaunch : handleApprove;
+  const primaryAction = isWrongNetwork ? handleSwitchNetwork : approvalSatisfied ? handleLaunch : handleApprove;
   const launchFeeText = formatEther(launchFeeWei ?? defaultLaunchConfig.maxLaunchFeeWeiFallback);
   const firstBuyText = firstBuyAmount !== undefined ? formatUnits(firstBuyAmount, quoteDecimals) : '0';
 
@@ -694,6 +725,8 @@ export function LaunchSubmitActions({
       <p className='text-sm leading-7 text-[#8f9482]'>
         {!isConnected
           ? locale.walletRequired
+          : isWrongNetwork
+            ? locale.switchNetworkFirst
           : !name.trim() || !ticker.trim() || !resolvedQuoteToken || firstBuyAmount === undefined
             ? locale.missingFields
             : imageUploading

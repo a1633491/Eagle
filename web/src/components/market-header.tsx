@@ -48,12 +48,12 @@ export function MarketHeader({ overview }: { overview: MarketOverview }) {
           </span>
           <span className="hidden text-[1.55rem] font-semibold tracking-[-0.07em] min-[380px]:inline">Eagle.</span>
         </Link>
-        <div className="relative hidden h-10 items-center rounded-full border border-white/10 bg-white/[0.04] md:flex">
+        <div className="relative flex h-10 items-center rounded-full border border-white/10 bg-white/[0.04] md:flex">
           <select
             aria-label="Network"
             value={chainKey}
             onChange={(event) => router.push(switchChainHref(event.target.value as ChainKey))}
-            className="h-10 appearance-none rounded-full bg-transparent pl-3.5 pr-9 text-[12px] text-[#d2d5c9] outline-none"
+            className="h-10 min-w-[84px] appearance-none rounded-full bg-transparent pl-3 pr-8 text-[12px] text-[#d2d5c9] outline-none sm:min-w-[96px] sm:pl-3.5 sm:pr-9"
           >
             <option value="bsc" className="bg-[#151714] text-[#f1e4b7]">
               BNB Chain
@@ -62,7 +62,7 @@ export function MarketHeader({ overview }: { overview: MarketOverview }) {
               Base
             </option>
           </select>
-          <ChevronDown className="h-4 w-4 text-[#a5aa99]" />
+          <ChevronDown className="pointer-events-none absolute right-2.5 h-4 w-4 text-[#a5aa99]" />
         </div>
         <nav className="ml-2 hidden items-center gap-4.5 text-[13px] text-[#a6aa99] md:flex">
           <Link href={withLang('/')} className="text-[#f1e4b7] transition hover:text-[#f1e4b7]">

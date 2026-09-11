@@ -496,7 +496,9 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
                   <span>{t(lang, 'search')}...</span>
                 )
               ) : quoteTokenInput.trim() ? (
-                <span className='text-[#f87171]'>{locale.quoteTokenInvalid}</span>
+                <span className='text-[#f87171]'>
+                  {locale.quoteTokenInvalid.replaceAll('BSC', chain.shortName).replace('BEP20', 'ERC20')}
+                </span>
               ) : null}
             </div>
           ) : null}
