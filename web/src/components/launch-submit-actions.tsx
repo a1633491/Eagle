@@ -32,6 +32,9 @@ type LaunchSubmitActionsProps = {
   name: string;
   ticker: string;
   story: string;
+  websiteUrl: string;
+  twitterUrl: string;
+  telegramUrl: string;
   imageUrl: string;
   imageUploading: boolean;
   pair: PairKey;
@@ -278,6 +281,9 @@ export function LaunchSubmitActions({
   name,
   ticker,
   story,
+  websiteUrl,
+  twitterUrl,
+  telegramUrl,
   imageUrl,
   imageUploading,
   pair,
@@ -406,9 +412,12 @@ export function LaunchSubmitActions({
       symbol: ticker.trim(),
       description: story.trim(),
       image: imageUrl || undefined,
+      external_url: websiteUrl.trim() || undefined,
+      twitter: twitterUrl.trim() || undefined,
+      telegram: telegramUrl.trim() || undefined,
     });
     return `data:application/json,${encodeURIComponent(payload)}`;
-  }, [imageUrl, name, story, ticker]);
+  }, [imageUrl, name, story, ticker, websiteUrl, twitterUrl, telegramUrl]);
 
   const readyForPrediction = Boolean(address && name.trim() && ticker.trim());
 

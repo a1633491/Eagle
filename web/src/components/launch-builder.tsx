@@ -3,7 +3,10 @@
 import Link from 'next/link';
 import { Globe, ImagePlus, Plus, Search, Triangle } from 'lucide-react';
 import { useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useReadContract } from 'wagmi';
+import { isAddress } from 'viem';
 import { LaunchSubmitActions } from '@/components/launch-submit-actions';
+import { eagleErc20Abi } from '@/lib/contracts';
 import { t, withLang, type Lang } from '@/lib/i18n';
 
 const pairOptions = [
@@ -45,6 +48,15 @@ const copy = {
     advancedSettings: '高级参数',
     advancedHint: '默认值已可直接发射，需要更细控制时再展开。',
     advancedSummary: '已使用高级发射参数',
+    websiteLabel: '网站',
+    websitePlaceholder: 'https://your-site.com',
+    xLabel: 'X',
+    xPlaceholder: 'https://x.com/yourproject',
+    telegramLabel: 'Telegram',
+    telegramPlaceholder: 'https://t.me/yourproject',
+    quoteTokenPlaceholder: '输入 BSC 代币合约地址',
+    quoteTokenDetected: '已识别配对币',
+    quoteTokenInvalid: '请输入有效的 BSC BEP20 合约地址',
   },
   en: {
     native: 'Native',
@@ -76,6 +88,15 @@ const copy = {
     advancedSettings: 'Advanced settings',
     advancedHint: 'The defaults are launch-ready. Expand only when you need finer control.',
     advancedSummary: 'Advanced launch parameters enabled',
+    websiteLabel: 'Website',
+    websitePlaceholder: 'https://your-site.com',
+    xLabel: 'X',
+    xPlaceholder: 'https://x.com/yourproject',
+    telegramLabel: 'Telegram',
+    telegramPlaceholder: 'https://t.me/yourproject',
+    quoteTokenPlaceholder: 'Enter a BSC token contract address',
+    quoteTokenDetected: 'Detected quote token',
+    quoteTokenInvalid: 'Enter a valid BSC BEP20 contract address',
   },
   ja: {
     native: 'ネイティブ',
@@ -107,6 +128,15 @@ const copy = {
     advancedSettings: '詳細設定',
     advancedHint: 'デフォルト値のままでローンチできます。細かく調整したい時だけ開いてください。',
     advancedSummary: '詳細なローンチ設定を使用中',
+    websiteLabel: 'Website',
+    websitePlaceholder: 'https://your-site.com',
+    xLabel: 'X',
+    xPlaceholder: 'https://x.com/yourproject',
+    telegramLabel: 'Telegram',
+    telegramPlaceholder: 'https://t.me/yourproject',
+    quoteTokenPlaceholder: 'BSC トークンコントラクトアドレスを入力',
+    quoteTokenDetected: '認識したペアトークン',
+    quoteTokenInvalid: '有効な BSC BEP20 コントラクトアドレスを入力してください',
   },
 } as const;
 
@@ -115,6 +145,10 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
   const [name, setName] = useState('');
   const [ticker, setTicker] = useState('');
   const [story, setStory] = useState('');
+  const [showSocialLinks, setShowSocialLinks] = useState(false);
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [twitterUrl, setTwitterUrl] = useState('');
+  const [telegramUrl, setTelegramUrl] = useState('');
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [imageFileName, setImageFileName] = useState('');
@@ -129,12 +163,31 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
   const [feeTier] = useState<100 | 500 | 2500 | 10000>(10000);
   const [initialBuyMinTokensOut] = useState('0');
   const advancedOpen = false;
+  const resolvedCustomQuoteToken = pair === 'ANY' && isAddress(quoteTokenInput) ? quoteTokenInput : undefined;
+
+  const { data: customQuoteSymbol } = useReadContract({
+    address: resolvedCustomQuoteToken,
+    abi: eagleErc20Abi,
+    functionName: 'symbol',
+    query: {
+      enabled: Boolean(resolvedCustomQuoteToken),
+    },
+  });
+
+  const { data: customQuoteName } = useReadContract({
+    address: resolvedCustomQuoteToken,
+    abi: eagleErc20Abi,
+    functionName: 'name',
+    query: {
+      enabled: Boolean(resolvedCustomQuoteToken),
+    },
+  });
 
   const pairLabel = useMemo(() => {
     if (pair === 'USDT') return 'USDT';
-    if (pair === 'ANY') return 'TOKEN';
+    if (pair === 'ANY') return customQuoteSymbol ?? 'TOKEN';
     return 'BNB';
-  }, [pair]);
+  }, [customQuoteSymbol, pair]);
 
   const locale = copy[lang];
   const feeTargetLabel = feeTarget === 'wallet' ? t(lang, 'feeWallet') : locale.holders;
@@ -341,12 +394,45 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
 
             <button
               type='button'
+              onClick={() => setShowSocialLinks((current) => !current)}
               className='inline-flex items-center gap-2 text-sm text-[#d8c483] transition hover:text-[#f1e4b7]'
             >
               <Plus className='h-4 w-4' />
               {t(lang, 'addWebsiteSocial')}
               <span className='text-[#8f9482]'>{t(lang, 'optional')}</span>
             </button>
+
+            {showSocialLinks ? (
+              <div className='grid gap-4 rounded-[18px] border border-white/8 bg-[#111310] p-4 md:grid-cols-3'>
+                <div>
+                  <label className='mb-2 block text-sm font-medium text-[#f3f1e8]'>{locale.websiteLabel}</label>
+                  <input
+                    value={websiteUrl}
+                    onChange={(event) => setWebsiteUrl(event.target.value)}
+                    placeholder={locale.websitePlaceholder}
+                    className='h-11 w-full rounded-[14px] border border-white/8 bg-[#171916] px-3 text-sm text-[#f3f1e8] outline-none placeholder:text-[#6f7468]'
+                  />
+                </div>
+                <div>
+                  <label className='mb-2 block text-sm font-medium text-[#f3f1e8]'>{locale.xLabel}</label>
+                  <input
+                    value={twitterUrl}
+                    onChange={(event) => setTwitterUrl(event.target.value)}
+                    placeholder={locale.xPlaceholder}
+                    className='h-11 w-full rounded-[14px] border border-white/8 bg-[#171916] px-3 text-sm text-[#f3f1e8] outline-none placeholder:text-[#6f7468]'
+                  />
+                </div>
+                <div>
+                  <label className='mb-2 block text-sm font-medium text-[#f3f1e8]'>{locale.telegramLabel}</label>
+                  <input
+                    value={telegramUrl}
+                    onChange={(event) => setTelegramUrl(event.target.value)}
+                    placeholder={locale.telegramPlaceholder}
+                    className='h-11 w-full rounded-[14px] border border-white/8 bg-[#171916] px-3 text-sm text-[#f3f1e8] outline-none placeholder:text-[#6f7468]'
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -387,13 +473,30 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
               <input
                 value={quoteTokenInput}
                 onChange={(event) => setQuoteTokenInput(event.target.value)}
-                placeholder='0x...'
+                placeholder={locale.quoteTokenPlaceholder}
                 className='w-full bg-transparent text-sm text-[#f3f1e8] outline-none placeholder:text-[#6f7468]'
               />
             ) : (
               <span>{pair === 'BNB' ? 'WBNB' : 'USDT'}</span>
             )}
           </div>
+
+          {pair === 'ANY' ? (
+            <div className='mt-3 text-xs text-[#8f9482]'>
+              {resolvedCustomQuoteToken ? (
+                customQuoteSymbol || customQuoteName ? (
+                  <span>
+                    {locale.quoteTokenDetected}: <span className='text-[#f3f1e8]'>{customQuoteName ?? customQuoteSymbol}</span>
+                    {customQuoteSymbol ? <span className='text-[#d8c483]'> ({customQuoteSymbol})</span> : null}
+                  </span>
+                ) : (
+                  <span>{t(lang, 'search')}...</span>
+                )
+              ) : quoteTokenInput.trim() ? (
+                <span className='text-[#f87171]'>{locale.quoteTokenInvalid}</span>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className='mt-6 space-y-5 rounded-[22px] border border-white/8 bg-[#131512] p-5'>
             <div className='flex items-center justify-between gap-4'>
@@ -496,6 +599,16 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
                   <span className='text-[#8f9482]'>{t(lang, 'firstPurchase')}</span>
                   <span className='text-[#f3f1e8]'>{firstBuy || '0.00'} {pairLabel}</span>
                 </div>
+                {websiteUrl || twitterUrl || telegramUrl ? (
+                  <div className='flex items-center justify-between gap-4'>
+                    <span className='text-[#8f9482]'>{t(lang, 'addWebsiteSocial')}</span>
+                    <span className='text-[#f3f1e8]'>
+                      {[websiteUrl && locale.websiteLabel, twitterUrl && locale.xLabel, telegramUrl && locale.telegramLabel]
+                        .filter(Boolean)
+                        .join(' / ')}
+                    </span>
+                  </div>
+                ) : null}
                 {advancedOpen ? (
                   <div className='flex items-center justify-between gap-4'>
                     <span className='text-[#8f9482]'>{locale.advancedSettings}</span>
@@ -512,6 +625,9 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
               name={name}
               ticker={ticker}
               story={story}
+              websiteUrl={websiteUrl}
+              twitterUrl={twitterUrl}
+              telegramUrl={telegramUrl}
               imageUrl={imageUrl}
               imageUploading={imageUploading}
               pair={pair}
@@ -548,6 +664,14 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
             <p className='mt-3.5 text-[14px] leading-7 text-[#a8ad99]'>
               {story || locale.previewStory}
             </p>
+
+            {websiteUrl || twitterUrl || telegramUrl ? (
+              <div className='mt-4 flex flex-wrap gap-2 text-xs text-[#d8c483]'>
+                {websiteUrl ? <span className='rounded-full border border-white/8 bg-[#10120f] px-3 py-1'>{locale.websiteLabel}</span> : null}
+                {twitterUrl ? <span className='rounded-full border border-white/8 bg-[#10120f] px-3 py-1'>{locale.xLabel}</span> : null}
+                {telegramUrl ? <span className='rounded-full border border-white/8 bg-[#10120f] px-3 py-1'>{locale.telegramLabel}</span> : null}
+              </div>
+            ) : null}
 
             <div className='mt-4 grid gap-3 rounded-[18px] border border-white/8 bg-[#10120f] p-4'>
               <div className='flex items-center justify-between text-[14px]'>
