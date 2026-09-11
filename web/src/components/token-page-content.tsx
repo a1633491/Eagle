@@ -7,16 +7,19 @@ import { type Address, formatUnits, isAddress, zeroAddress } from 'viem';
 import { SwapPanel } from '@/components/swap-panel';
 import { TokenChainActions } from '@/components/token-chain-actions';
 import { TokenMarketSections } from '@/components/token-market-sections';
+import { getChainConfig, type ChainKey } from '@/lib/chains';
 import { currency, percent, shorten } from '@/lib/format';
-import { eagleContracts, eagleErc20Abi, eagleFactoryAbi, eagleLiquidityLockerAbi } from '@/lib/contracts';
+import { eagleErc20Abi, eagleFactoryAbi, eagleLiquidityLockerAbi, getEagleContracts } from '@/lib/contracts';
 import { t, type Lang } from '@/lib/i18n';
 import { getTokenImageUrl } from '@/lib/token-image';
 import { type TokenDetail } from '@/lib/types';
 import { useLiveTokenMarket } from '@/lib/use-live-token-market';
 
-function getFallbackQuoteContract(token: TokenDetail) {
-  if (token.quoteSymbol === 'WBNB') return eagleContracts.wbnb;
-  if (token.quoteSymbol === 'USDT') return eagleContracts.usdt;
+function getFallbackQuoteContract(token: TokenDetail, chainKey: ChainKey) {
+  const chain = getChainConfig(chainKey);
+  const contracts = getEagleContracts(chainKey);
+  if (token.quoteSymbol === chain.wrappedNativeSymbol) return contracts.wrappedNativeToken;
+  if (token.quoteSymbol === chain.stableSymbol) return contracts.stableToken;
   return token.poolAddress as Address;
 }
 
@@ -56,7 +59,9 @@ function formatRelativeLaunch(timestamp: bigint | undefined, fallback: string, l
   return rtf.format(Math.round(diffHours / 24), 'day');
 }
 
-export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDetail }) {
+export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token: TokenDetail; chainKey: ChainKey }) {
+  const chain = getChainConfig(chainKey);
+  const contracts = getEagleContracts(chainKey);
   const publicClient = usePublicClient();
   const [launchTimestamp, setLaunchTimestamp] = useState<bigint | undefined>();
   const [launchTxHash, setLaunchTxHash] = useState<string | undefined>();
@@ -64,12 +69,12 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
   const normalizedToken = isAddress(token.address) ? (token.address as Address) : undefined;
 
   const { data: launchRecord } = useReadContract({
-    address: eagleContracts.factory,
+    address: contracts.factory,
     abi: eagleFactoryAbi,
     functionName: 'launches',
     args: normalizedToken ? [normalizedToken] : undefined,
     query: {
-      enabled: Boolean(normalizedToken),
+      enabled: Boolean(normalizedToken && contracts.factory),
     },
   });
 
@@ -149,7 +154,7 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
         const [block, logs] = await Promise.all([
           publicClient.getBlock({ blockNumber: onchainLaunchBlock }),
           publicClient.getLogs({
-            address: eagleContracts.factory,
+            address: contracts.factory,
             event: eagleFactoryAbi[0],
             args: { token: normalizedToken },
             fromBlock: onchainLaunchBlock,
@@ -171,23 +176,23 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
     return () => {
       cancelled = true;
     };
-  }, [normalizedToken, onchainLaunchBlock, publicClient]);
+  }, [contracts.factory, normalizedToken, onchainLaunchBlock, publicClient]);
 
   const symbol = tokenSymbolData ?? token.symbol;
-  const quoteContract = onchainQuoteToken ?? getFallbackQuoteContract(token);
+  const quoteContract = onchainQuoteToken ?? getFallbackQuoteContract(token, chainKey);
   const poolAddress = onchainPool && onchainPool !== zeroAddress ? onchainPool : token.poolAddress;
   const creatorAddress = onchainCreator && onchainCreator !== zeroAddress ? onchainCreator : token.creator;
   const { data: creatorClaimableFees } = useReadContract({
-    address: eagleContracts.locker,
+    address: contracts.locker,
     abi: eagleLiquidityLockerAbi,
     functionName: 'claimableFees',
     args: creatorAddress && quoteContract ? [creatorAddress as Address, quoteContract as Address] : undefined,
     query: {
-      enabled: Boolean(creatorAddress && quoteContract),
+      enabled: Boolean(creatorAddress && quoteContract && contracts.locker),
       refetchInterval: 15000,
     },
   });
-  const liveMarket = useLiveTokenMarket(token.address, {
+  const liveMarket = useLiveTokenMarket(token.address, chainKey, {
     priceUsd: token.priceUsd,
     change24h: token.change24h,
     volume24h: token.volume24h,
@@ -238,7 +243,7 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
             <span className='mx-1'>/</span>
             <span>{symbol}</span>
           </div>
-          <div className='mb-1 text-[13px] text-[#8f9482]'>{t(lang, 'bnbChain')}</div>
+          <div className='mb-1 text-[13px] text-[#8f9482]'>{chain.name}</div>
           <div className='flex flex-wrap items-start justify-between gap-4'>
             <div className='min-w-0'>
               <div className='mt-1.5 flex items-center gap-3'>
@@ -268,7 +273,7 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
                 </span>
                 <span>{shorten(token.address)}</span>
                 <a
-                  href={`https://bscscan.com/token/${token.address}`}
+                  href={`${chain.explorerBaseUrl}/token/${token.address}`}
                   target='_blank'
                   rel='noreferrer'
                   className='inline-flex items-center gap-1 text-[#d8c483] transition hover:text-[#f1e4b7]'
@@ -307,20 +312,20 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
       </section>
       <aside className='min-w-0 space-y-6'>
         <SwapPanel lang={lang} token={liveToken} creatorClaimableText={creatorClaimableText} />
-        <TokenChainActions lang={lang} tokenAddress={token.address} />
+        <TokenChainActions lang={lang} tokenAddress={token.address} chainKey={chainKey} />
         <div className='rounded-[24px] border border-white/8 bg-[#1a1c19]/96 p-4 sm:p-5'>
           <h2 className='text-lg font-semibold text-[#f3f1e8]'>{t(lang, 'tokenDetails')}</h2>
           <div className='mt-4 divide-y divide-white/6 rounded-[18px] border border-white/8 bg-[#131512] text-sm text-[#a8ad99]'>
             <DetailRow label={t(lang, 'tradingPair')} value={pairLabel} />
-            <DetailLink label={t(lang, 'quoteContract')} href={`https://bscscan.com/token/${quoteContract}`} value={shorten(quoteContract)} />
-            <DetailLink label={t(lang, 'pool')} href={`https://bscscan.com/address/${poolAddress}`} value={shorten(poolAddress)} />
-            <DetailLink label={t(lang, 'creator')} href={`https://bscscan.com/address/${creatorAddress}`} value={shorten(creatorAddress)} />
+            <DetailLink label={t(lang, 'quoteContract')} href={`${chain.explorerBaseUrl}/token/${quoteContract}`} value={shorten(quoteContract)} />
+            <DetailLink label={t(lang, 'pool')} href={`${chain.explorerBaseUrl}/address/${poolAddress}`} value={shorten(poolAddress)} />
+            <DetailLink label={t(lang, 'creator')} href={`${chain.explorerBaseUrl}/address/${creatorAddress}`} value={shorten(creatorAddress)} />
             <DetailRow label={t(lang, 'totalSupply')} value={totalSupply} />
             <DetailRow label={t(lang, 'launched')} value={launchedDate} />
           </div>
           {launchTxHash ? (
             <a
-              href={`https://bscscan.com/tx/${launchTxHash}`}
+              href={`${chain.explorerBaseUrl}/tx/${launchTxHash}`}
               target='_blank'
               rel='noreferrer'
               className='mt-4 inline-flex items-center gap-1 text-sm text-[#d8c483] transition hover:text-[#f1e4b7]'

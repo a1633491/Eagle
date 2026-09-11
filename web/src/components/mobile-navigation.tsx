@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { BookOpen, Compass, Plus, Wallet } from 'lucide-react';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { normalizeChainKey, withLangAndChain } from '@/lib/chains';
 import { normalizeLang, t, withLang } from '@/lib/i18n';
 
 export function MobileNavigation() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const lang = normalizeLang(searchParams.get('lang') ?? undefined);
+  const chainKey = normalizeChainKey(searchParams.get('chain') ?? undefined);
   const items = [
     { href: '/', label: t(lang, 'navExplore'), icon: Compass },
     { href: '/launch', label: t(lang, 'navCreate'), icon: Plus, emphasize: true },
@@ -24,7 +26,7 @@ export function MobileNavigation() {
         return (
           <Link
             key={href}
-            href={withLang(href, lang)}
+            href={withLangAndChain(href, lang, chainKey)}
             className={`relative flex min-h-[62px] flex-col items-center justify-center gap-1 rounded-[16px] px-2 py-2 text-[11px] transition ${
               active ? 'text-[#f1e4b7]' : 'text-[#a3a899]'
             }`}

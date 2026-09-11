@@ -35,9 +35,17 @@ const config = {
       chainId: 56,
       accounts,
     },
+    base: {
+      url: process.env.BASE_RPC_URL || '',
+      chainId: 8453,
+      accounts,
+    },
   },
   etherscan: {
-    apiKey: process.env.BSCSCAN_API_KEY || '',
+    apiKey: {
+      bsc: process.env.BSCSCAN_API_KEY || '',
+      base: process.env.BASESCAN_API_KEY || '',
+    },
   },
 };
 

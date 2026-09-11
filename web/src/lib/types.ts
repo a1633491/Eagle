@@ -1,4 +1,6 @@
 export type TokenSummary = {
+  chainKey: string;
+  chainId: number;
   address: string;
   name: string;
   symbol: string;
@@ -16,6 +18,7 @@ export type TokenSummary = {
   official?: boolean;
   tags: string[];
   metadataURI?: string;
+  explorerBaseUrl?: string;
 };
 
 export type Trade = {
@@ -42,6 +45,8 @@ export type TokenDetail = TokenSummary & {
 };
 
 export type MarketOverview = {
+  chainKey: string;
+  chainId: number;
   chain: string;
   launchedCount: number;
   totalVolume24h: number;

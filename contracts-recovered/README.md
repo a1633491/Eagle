@@ -86,7 +86,7 @@ This is useful for understanding the locker, but in the deployable Eagle archite
 2. Fill in your owner, treasury, RPC, deployer key, and `BSCSCAN_API_KEY`
 3. Run `npm install`
 4. Run `npm run compile`
-5. Run `npm run deploy:bsc`
-6. Run `npm run verify:bsc`
+5. Run `npm run deploy:bsc` or `npm run deploy -- --network base`
+6. Run `npm run verify:bsc` or `npm run verify -- --network base`
 
 Deployment output is written to `deployments/bsc.json`.

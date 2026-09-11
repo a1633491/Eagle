@@ -1,16 +1,18 @@
 import Link from 'next/link';
 import { MarketHeader } from '@/components/market-header';
 import { getMarketOverview } from '@/lib/api';
+import { normalizeChainKey, withLangAndChain } from '@/lib/chains';
 import { normalizeLang, t, withLang } from '@/lib/i18n';
 
 type MyTokensPageProps = {
-  searchParams: Promise<{ lang?: string }>;
+  searchParams: Promise<{ lang?: string; chain?: string }>;
 };
 
 export default async function MyTokensPage({ searchParams }: MyTokensPageProps) {
   const params = await searchParams;
   const lang = normalizeLang(params.lang);
-  const overview = await getMarketOverview();
+  const chainKey = normalizeChainKey(params.chain);
+  const overview = await getMarketOverview(chainKey);
 
   return (
     <div className='min-h-screen bg-[#151714]'>
@@ -23,7 +25,7 @@ export default async function MyTokensPage({ searchParams }: MyTokensPageProps) 
             {t(lang, 'pickUp')}
           </p>
           <Link
-            href={withLang('/launch', lang)}
+            href={withLangAndChain('/launch', lang, chainKey)}
             className='mt-6 inline-flex h-10 items-center rounded-full border border-[#f6e3ac66] bg-[linear-gradient(145deg,#f7e8ba,#d1b773)] px-5 text-sm font-medium text-[#342d1a] transition hover:brightness-105'
           >
             {t(lang, 'newToken')}
@@ -37,7 +39,7 @@ export default async function MyTokensPage({ searchParams }: MyTokensPageProps) 
             {t(lang, 'createDraft')}
           </p>
           <Link
-            href={withLang('/launch', lang)}
+            href={withLangAndChain('/launch', lang, chainKey)}
             className='mt-6 inline-flex h-10 items-center rounded-full border border-white/10 bg-white/[0.04] px-5 text-sm font-medium text-[#f1e4b7] transition hover:bg-white/[0.06]'
           >
             {t(lang, 'createFirstToken')}

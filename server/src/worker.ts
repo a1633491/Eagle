@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { marketOverview, tokenDetails } from './data/mockData.js';
+import { getChainConfig, normalizeChainKey } from './chainConfig.js';
 import {
   forceFactorySync,
   getFactorySyncStatus,
@@ -52,8 +53,11 @@ type WorkerBindings = {
   MONGODB_URI?: string;
   REDIS_URL?: string;
   BSC_RPC_URL?: string;
+  BASE_RPC_URL?: string;
   EAGLE_FACTORY_ADDRESS?: string;
+  BASE_FACTORY_ADDRESS?: string;
   EAGLE_FACTORY_START_BLOCK?: string;
+  BASE_FACTORY_START_BLOCK?: string;
   EAGLE_SYNC_BLOCK_WINDOW?: string;
   EAGLE_SYNC_CHUNK_SIZE?: string;
   EAGLE_SYNC_MAX_CHUNKS_PER_RUN?: string;
@@ -120,11 +124,15 @@ app.get('/api/health', (c) => {
 
 app.get('/api/tokens', async (c) => {
   try {
-    const overview = await getMarketOverview(marketOverview);
+    const chainKey = normalizeChainKey(c.req.query('chain'));
+    const chain = getChainConfig(chainKey);
+    const overview = await getMarketOverview({ ...marketOverview, chain: chain.name }, chainKey);
     return c.json(ok(overview));
   } catch (error) {
+    const chainKey = normalizeChainKey(c.req.query('chain'));
+    const chain = getChainConfig(chainKey);
     return c.json(
-      ok({ ...marketOverview, launchedCount: 0, totalVolume24h: 0, trending: [], tokens: [] }),
+      ok({ ...marketOverview, chainKey, chainId: chain.chainId, chain: chain.name, launchedCount: 0, totalVolume24h: 0, trending: [], tokens: [] }),
       200,
     );
   }
@@ -132,7 +140,7 @@ app.get('/api/tokens', async (c) => {
 
 app.get('/api/tokens/sync-status', async (c) => {
   try {
-    const status = await getFactorySyncStatus();
+    const status = await getFactorySyncStatus(normalizeChainKey(c.req.query('chain')));
     return c.json(ok(status));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to get sync status';
@@ -142,10 +150,11 @@ app.get('/api/tokens/sync-status', async (c) => {
 
 app.post('/api/tokens/sync', async (c) => {
   try {
+    const chainKey = normalizeChainKey(c.req.query('chain'));
     const body = (await c.req.json<{ reset?: boolean }>().catch(() => ({} as { reset?: boolean }))) as {
       reset?: boolean;
     };
-    const status = await forceFactorySync({ reset: Boolean(body.reset) });
+    const status = await forceFactorySync({ reset: Boolean(body.reset), chainKey });
     return c.json(ok(status));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to sync factory launches';
@@ -222,7 +231,8 @@ app.get('/api/images/:key', async (c) => {
 
 app.get('/api/tokens/:address', async (c) => {
   try {
-    const token = await getTokenDetail(c.req.param('address'), tokenDetails);
+    const chainKey = normalizeChainKey(c.req.query('chain'));
+    const token = await getTokenDetail(c.req.param('address'), tokenDetails, chainKey);
     return c.json(ok(token));
   } catch {
     return c.json(fail('Token not found', 404), 404);
@@ -231,7 +241,8 @@ app.get('/api/tokens/:address', async (c) => {
 
 app.get('/api/tokens/:address/trades', async (c) => {
   try {
-    const trades = await getTokenTrades(c.req.param('address'), tokenDetails);
+    const chainKey = normalizeChainKey(c.req.query('chain'));
+    const trades = await getTokenTrades(c.req.param('address'), tokenDetails, chainKey);
     return c.json(ok(trades));
   } catch {
     return c.json(fail('Token not found', 404), 404);
@@ -244,7 +255,8 @@ app.post('/api/verify-token', (c) => {
 
 async function runScheduledSync(bindings: WorkerBindings) {
   applyBindings(bindings);
-  await forceFactorySync();
+  await forceFactorySync({ chainKey: 'bsc' });
+  await forceFactorySync({ chainKey: 'base' });
 }
 
 export default {

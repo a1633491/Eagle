@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { EagleMark } from '@/components/eagle-mark';
+import { type ChainKey, withLangAndChain } from '@/lib/chains';
 import { shorten } from '@/lib/format';
 import { t, withLang, type Lang } from '@/lib/i18n';
 import { getTokenImageUrl } from '@/lib/token-image';
@@ -71,11 +72,13 @@ function sortTokens<T extends { address: string }>(tokens: T[], compare: (left: 
 
 export function HomeExploreTabs({
   lang,
+  chainKey,
   query,
   tokens,
   trending,
 }: {
   lang: Lang;
+  chainKey: ChainKey;
   query?: string;
   tokens: TokenDetail[];
   trending: TokenDetail[];
@@ -126,7 +129,7 @@ export function HomeExploreTabs({
         {visibleTokens.map((token) => (
           <Link
             key={token.address}
-            href={withLang(`/token?address=${token.address}`, lang)}
+            href={withLangAndChain(`/token?address=${token.address}`, lang, chainKey)}
             aria-label={`${t(lang, 'explore')} ${token.name}`}
             className='flex min-h-0 w-full flex-col overflow-hidden rounded-[24px] border border-[#30352f] bg-[#161917] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition hover:border-[#4a5147]'
           >

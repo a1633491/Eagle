@@ -14,6 +14,8 @@ const makeChart = (start: number) =>
 
 export const tokenDetails: TokenDetail[] = [
   {
+    chainKey: 'bsc',
+    chainId: 56,
     address: '0xfa6d9b504848606eb9aec04ccc161d169b3f2159',
     name: 'EAGLE',
     symbol: 'EAGLE',
@@ -43,6 +45,8 @@ export const tokenDetails: TokenDetail[] = [
     ],
   },
   {
+    chainKey: 'bsc',
+    chainId: 56,
     address: '0x8519a83aec3e38f7609b1e767c3e0eeb54f47bb6',
     name: 'Dust Astherus',
     symbol: 'DUST',
@@ -68,6 +72,8 @@ export const tokenDetails: TokenDetail[] = [
     ],
   },
   {
+    chainKey: 'bsc',
+    chainId: 56,
     address: '0x2573d4629d82dc400419951930631b6dbcb1fe97',
     name: 'Eagledog',
     symbol: 'EAGLEDOG',
@@ -94,6 +100,8 @@ export const tokenDetails: TokenDetail[] = [
 ];
 
 export const marketOverview: MarketOverview = {
+  chainKey: 'bsc',
+  chainId: 56,
   chain: 'BNB Chain',
   launchedCount: 15,
   totalVolume24h: tokenDetails.reduce((sum, item) => sum + item.volume24h, 0),

@@ -1,0 +1,45 @@
+{
+  "network": "base",
+  "chainId": "8453",
+  "deployer": "0xd25163E144592c695D49EC6b5E3a9C723B9a1972",
+  "pancakeV3Factory": "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865",
+  "positionManager": "0x46A15B0b27311cedF172AB29E4f4766fbE7F4364",
+  "wbnb": "0x4200000000000000000000000000000000000006",
+  "owner": "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
+  "treasury": "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
+  "launchFeeWei": "10000000000000000",
+  "protocolLpFeeBps": 5000,
+  "eagleFactory": "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE",
+  "eagleLiquidityLocker": "0x01ec131cF83F2978780D969b79f4839090618187",
+  "eagleDistributorFactory": "0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726",
+  "verification": {
+    "eagleFactory": {
+      "address": "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE",
+      "contract": "contracts/BrewLaunchSuite.sol:EagleFactory",
+      "constructorArguments": [
+        "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865",
+        "0x46A15B0b27311cedF172AB29E4f4766fbE7F4364",
+        "0x4200000000000000000000000000000000000006",
+        "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
+        "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
+        "10000000000000000",
+        5000
+      ]
+    },
+    "eagleLiquidityLocker": {
+      "address": "0x01ec131cF83F2978780D969b79f4839090618187",
+      "contract": "contracts/BrewLaunchSuite.sol:EagleLiquidityLocker",
+      "constructorArguments": [
+        "0x46A15B0b27311cedF172AB29E4f4766fbE7F4364",
+        "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE"
+      ]
+    },
+    "eagleDistributorFactory": {
+      "address": "0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726",
+      "contract": "contracts/BrewLaunchSuite.sol:EagleDistributorFactory",
+      "constructorArguments": [
+        "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE"
+      ]
+    }
+  }
+}

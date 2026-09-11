@@ -1,17 +1,23 @@
 import mongoose, { Schema } from 'mongoose';
 import { createClient, type RedisClientType } from 'redis';
 import { createPublicClient, getAddress, http, isAddress, parseAbiItem } from 'viem';
+import {
+  getChainConfig,
+  getConfiguredFactoryAddress,
+  getConfiguredRpcUrl,
+  getConfiguredStartBlock,
+  getFactorySyncStateKey,
+  normalizeChainKey,
+  type ChainKey,
+} from './chainConfig.js';
 
-const DEFAULT_FACTORY_ADDRESS = '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE';
 const DEFAULT_QUOTE_TOKEN_PRICE = 0.0000049;
 const DEFAULT_SYNC_BLOCK_WINDOW = 20000n;
 const DEFAULT_SYNC_CHUNK_SIZE = 2000n;
 const DEFAULT_SYNC_MAX_CHUNKS_PER_RUN = 8;
 const DEFAULT_SYNC_COOLDOWN_MS = 30_000;
 const DEFAULT_CACHE_TTL_SECONDS = 30;
-const FACTORY_SYNC_STATE_KEY = 'factory-launch-sync';
 const WORKER_TOKENS_KV_KEY = 'tokens:all';
-const WORKER_SYNC_STATE_KV_KEY = `sync:${FACTORY_SYNC_STATE_KEY}`;
 const PINNED_OFFICIAL_TOKEN_ADDRESS = '0x281BF1DA0412B997ADA3aa38cf22001370E6e12F'.toLowerCase();
 const DEBUG_SERVER_URL = 'http://127.0.0.1:7777/event';
 const DEBUG_SESSION_ID = 'token-list-missing';
@@ -37,6 +43,8 @@ type ChartPoint = {
 };
 
 export type TokenRecord = {
+  chainKey: ChainKey;
+  chainId: number;
   address: string;
   name: string;
   symbol: string;
@@ -63,9 +71,12 @@ export type TokenRecord = {
   imageUrl?: string;
   feeTier?: number;
   launchedAt: string;
+  explorerBaseUrl: string;
 };
 
 export type MarketOverview = {
+  chainKey: ChainKey;
+  chainId: number;
   chain: string;
   launchedCount: number;
   totalVolume24h: number;
@@ -108,6 +119,7 @@ type FallbackOverview = {
 };
 
 export type RegisterTokenPayload = {
+  chainKey?: ChainKey;
   address: string;
   name: string;
   symbol: string;
@@ -123,6 +135,8 @@ export type RegisterTokenPayload = {
 };
 
 type StoredTokenDocument = {
+  chainKey: ChainKey;
+  chainId: number;
   address: string;
   name: string;
   symbol: string;
@@ -174,6 +188,7 @@ export type RuntimeDiagnostics = {
 
 type StoredSyncStateDocument = {
   key: string;
+  chainKey: ChainKey;
   syncStartedFrom: string;
   lastSyncedBlock: string;
   latestKnownBlock: string;
@@ -208,6 +223,8 @@ type SerializedStoredSyncState = Omit<StoredSyncStateDocument, 'updatedAt'> & {
 };
 
 type WorkerD1TokenRow = {
+  chain_key: ChainKey;
+  chain_id: number;
   address: string;
   name: string;
   symbol: string;
@@ -235,6 +252,7 @@ type WorkerD1TokenRow = {
 
 type WorkerD1SyncStateRow = {
   key: string;
+  chain_key: ChainKey;
   sync_started_from: string;
   last_synced_block: string;
   latest_known_block: string;
@@ -266,7 +284,9 @@ const tokenTradeSchema = new Schema<TokenTrade>(
 
 const storedTokenSchema = new Schema<StoredTokenDocument>(
   {
-    address: { type: String, required: true, unique: true, index: true },
+    chainKey: { type: String, enum: ['bsc', 'base'], required: true, default: 'bsc', index: true },
+    chainId: { type: Number, required: true, default: 56 },
+    address: { type: String, required: true, index: true },
     name: { type: String, required: true },
     symbol: { type: String, required: true },
     quoteToken: { type: String, required: true },
@@ -302,6 +322,7 @@ const StoredTokenModel =
 const storedSyncStateSchema = new Schema<StoredSyncStateDocument>(
   {
     key: { type: String, required: true, unique: true, index: true },
+    chainKey: { type: String, enum: ['bsc', 'base'], required: true, default: 'bsc', index: true },
     syncStartedFrom: { type: String, required: true, default: '0' },
     lastSyncedBlock: { type: String, required: true, default: '0' },
     latestKnownBlock: { type: String, required: true, default: '0' },
@@ -338,6 +359,14 @@ function getWorkerKvStore() {
 
 function getWorkerD1Store() {
   return isWorkerRuntime() ? workerD1Store : null;
+}
+
+function buildTokenStorageKey(chainKey: ChainKey, address: string) {
+  return `${chainKey}:${address.toLowerCase()}`;
+}
+
+function buildWorkerSyncStateKvKey(chainKey: ChainKey) {
+  return `sync:${getFactorySyncStateKey(chainKey)}`;
 }
 
 function serializeStoredToken(document: StoredTokenDocument): SerializedStoredToken {
@@ -381,6 +410,8 @@ function parseJsonValue<T>(value: string | null | undefined, fallback: T): T {
 
 function deserializeD1StoredToken(row: WorkerD1TokenRow): StoredTokenDocument {
   return {
+    chainKey: row.chain_key,
+    chainId: Number(row.chain_id ?? getChainConfig(row.chain_key).chainId),
     address: row.address,
     name: row.name,
     symbol: row.symbol,
@@ -410,6 +441,7 @@ function deserializeD1StoredToken(row: WorkerD1TokenRow): StoredTokenDocument {
 function deserializeD1SyncState(row: WorkerD1SyncStateRow): StoredSyncStateDocument {
   return {
     key: row.key,
+    chainKey: row.chain_key,
     syncStartedFrom: row.sync_started_from,
     lastSyncedBlock: row.last_synced_block,
     latestKnownBlock: row.latest_known_block,
@@ -419,116 +451,14 @@ function deserializeD1SyncState(row: WorkerD1SyncStateRow): StoredSyncStateDocum
   };
 }
 
-async function readWorkerStoredTokens() {
+async function readWorkerStoredTokens(chainKey?: ChainKey) {
   const d1 = getWorkerD1Store();
   if (d1) {
-    const result = await d1
-      .prepare(
-        `SELECT
-          address,
-          name,
-          symbol,
-          quote_token,
-          quote_symbol,
-          price_usd,
-          change_24h,
-          market_cap,
-          volume_24h,
-          liquidity,
-          holders,
-          description,
-          creator,
-          pool_address,
-          official,
-          tags_json,
-          total_supply,
-          launched_at,
-          metadata_uri,
-          fee_tier,
-          chart_json,
-          trades_json,
-          updated_at
-        FROM tokens
-        ORDER BY launched_at DESC`,
-      )
-      .all<WorkerD1TokenRow>();
-    const d1Tokens = result.results.map(deserializeD1StoredToken);
-    const kv = getWorkerKvStore();
-    if (!kv) {
-      return d1Tokens;
-    }
-    const payload = (await kv.get(WORKER_TOKENS_KV_KEY, {
-      type: 'json',
-    })) as SerializedStoredToken[] | null;
-    const kvTokens = (payload ?? []).map(deserializeStoredToken);
-    const mergedTokens = new Map<string, StoredTokenDocument>();
-    for (const token of kvTokens) {
-      mergedTokens.set(token.address, token);
-    }
-    for (const token of d1Tokens) {
-      mergedTokens.set(token.address, token);
-    }
-    return [...mergedTokens.values()].sort((left, right) => right.launchedAt.getTime() - left.launchedAt.getTime());
-  }
-
-  const kv = getWorkerKvStore();
-  if (!kv) return null;
-  const payload = (await kv.get(WORKER_TOKENS_KV_KEY, {
-    type: 'json',
-  })) as SerializedStoredToken[] | null;
-  return (payload ?? []).map(deserializeStoredToken);
-}
-
-async function readWorkerStoredToken(address: string) {
-  const d1 = getWorkerD1Store();
-  if (d1) {
-    const row = await d1
-      .prepare(
-        `SELECT
-          address,
-          name,
-          symbol,
-          quote_token,
-          quote_symbol,
-          price_usd,
-          change_24h,
-          market_cap,
-          volume_24h,
-          liquidity,
-          holders,
-          description,
-          creator,
-          pool_address,
-          official,
-          tags_json,
-          total_supply,
-          launched_at,
-          metadata_uri,
-          fee_tier,
-          chart_json,
-          trades_json,
-          updated_at
-        FROM tokens
-        WHERE address = ?`,
-      )
-      .bind(address.toLowerCase())
-      .first<WorkerD1TokenRow>();
-    if (row) {
-      return deserializeD1StoredToken(row);
-    }
-  }
-
-  const tokens = await readWorkerStoredTokens();
-  return tokens?.find((entry) => entry.address === address.toLowerCase()) ?? null;
-}
-
-async function writeWorkerStoredToken(document: StoredTokenDocument) {
-  const d1 = getWorkerD1Store();
-  if (d1) {
-    try {
-      await d1
-        .prepare(
-          `INSERT INTO tokens (
+    const statement = chainKey
+      ? d1.prepare(
+          `SELECT
+            chain_key,
+            chain_id,
             address,
             name,
             symbol,
@@ -552,8 +482,148 @@ async function writeWorkerStoredToken(document: StoredTokenDocument) {
             chart_json,
             trades_json,
             updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(address) DO UPDATE SET
+          FROM tokens
+          WHERE chain_key = ?
+          ORDER BY launched_at DESC`,
+        ).bind(chainKey)
+      : d1.prepare(
+          `SELECT
+            chain_key,
+            chain_id,
+            address,
+            name,
+            symbol,
+            quote_token,
+            quote_symbol,
+            price_usd,
+            change_24h,
+            market_cap,
+            volume_24h,
+            liquidity,
+            holders,
+            description,
+            creator,
+            pool_address,
+            official,
+            tags_json,
+            total_supply,
+            launched_at,
+            metadata_uri,
+            fee_tier,
+            chart_json,
+            trades_json,
+            updated_at
+          FROM tokens
+          ORDER BY launched_at DESC`,
+        );
+    const result = await statement.all<WorkerD1TokenRow>();
+    const d1Tokens = result.results.map(deserializeD1StoredToken);
+    const kv = getWorkerKvStore();
+    if (!kv) {
+      return d1Tokens;
+    }
+    const payload = (await kv.get(WORKER_TOKENS_KV_KEY, {
+      type: 'json',
+    })) as SerializedStoredToken[] | null;
+    const kvTokens = (payload ?? []).map(deserializeStoredToken).filter((entry) => (chainKey ? entry.chainKey === chainKey : true));
+    const mergedTokens = new Map<string, StoredTokenDocument>();
+    for (const token of kvTokens) {
+      mergedTokens.set(buildTokenStorageKey(token.chainKey, token.address), token);
+    }
+    for (const token of d1Tokens) {
+      mergedTokens.set(buildTokenStorageKey(token.chainKey, token.address), token);
+    }
+    return [...mergedTokens.values()].sort((left, right) => right.launchedAt.getTime() - left.launchedAt.getTime());
+  }
+
+  const kv = getWorkerKvStore();
+  if (!kv) return null;
+  const payload = (await kv.get(WORKER_TOKENS_KV_KEY, {
+    type: 'json',
+  })) as SerializedStoredToken[] | null;
+  return (payload ?? []).map(deserializeStoredToken).filter((entry) => (chainKey ? entry.chainKey === chainKey : true));
+}
+
+async function readWorkerStoredToken(address: string, chainKey: ChainKey) {
+  const d1 = getWorkerD1Store();
+  if (d1) {
+    const row = await d1
+      .prepare(
+        `SELECT
+          chain_key,
+          chain_id,
+          address,
+          name,
+          symbol,
+          quote_token,
+          quote_symbol,
+          price_usd,
+          change_24h,
+          market_cap,
+          volume_24h,
+          liquidity,
+          holders,
+          description,
+          creator,
+          pool_address,
+          official,
+          tags_json,
+          total_supply,
+          launched_at,
+          metadata_uri,
+          fee_tier,
+          chart_json,
+          trades_json,
+          updated_at
+        FROM tokens
+        WHERE chain_key = ? AND address = ?`,
+      )
+      .bind(chainKey, address.toLowerCase())
+      .first<WorkerD1TokenRow>();
+    if (row) {
+      return deserializeD1StoredToken(row);
+    }
+  }
+
+  const tokens = await readWorkerStoredTokens(chainKey);
+  return tokens?.find((entry) => entry.chainKey === chainKey && entry.address === address.toLowerCase()) ?? null;
+}
+
+async function writeWorkerStoredToken(document: StoredTokenDocument) {
+  const d1 = getWorkerD1Store();
+  if (d1) {
+    try {
+      await d1
+        .prepare(
+          `INSERT INTO tokens (
+            chain_key,
+            chain_id,
+            address,
+            name,
+            symbol,
+            quote_token,
+            quote_symbol,
+            price_usd,
+            change_24h,
+            market_cap,
+            volume_24h,
+            liquidity,
+            holders,
+            description,
+            creator,
+            pool_address,
+            official,
+            tags_json,
+            total_supply,
+            launched_at,
+            metadata_uri,
+            fee_tier,
+            chart_json,
+            trades_json,
+            updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(chain_key, address) DO UPDATE SET
+            chain_id = excluded.chain_id,
             name = excluded.name,
             symbol = excluded.symbol,
             quote_token = excluded.quote_token,
@@ -578,6 +648,8 @@ async function writeWorkerStoredToken(document: StoredTokenDocument) {
             updated_at = excluded.updated_at`,
         )
         .bind(
+          document.chainKey,
+          document.chainId,
           document.address.toLowerCase(),
           document.name,
           document.symbol,
@@ -613,7 +685,9 @@ async function writeWorkerStoredToken(document: StoredTokenDocument) {
   if (!kv) return false;
   try {
     const tokens = await readWorkerStoredTokens();
-    const nextTokens = (tokens ?? []).filter((entry) => entry.address !== document.address);
+    const nextTokens = (tokens ?? []).filter(
+      (entry) => !(entry.chainKey === document.chainKey && entry.address === document.address),
+    );
     nextTokens.push(document);
     await kv.put(WORKER_TOKENS_KV_KEY, JSON.stringify(nextTokens.map(serializeStoredToken)));
     return true;
@@ -622,13 +696,14 @@ async function writeWorkerStoredToken(document: StoredTokenDocument) {
   }
 }
 
-async function readWorkerSyncState() {
+async function readWorkerSyncState(chainKey: ChainKey) {
   const d1 = getWorkerD1Store();
   if (d1) {
     const row = await d1
       .prepare(
         `SELECT
           key,
+          chain_key,
           sync_started_from,
           last_synced_block,
           latest_known_block,
@@ -638,7 +713,7 @@ async function readWorkerSyncState() {
         FROM sync_state
         WHERE key = ?`,
       )
-      .bind(FACTORY_SYNC_STATE_KEY)
+      .bind(getFactorySyncStateKey(chainKey))
       .first<WorkerD1SyncStateRow>();
     if (row) {
       return deserializeD1SyncState(row);
@@ -647,7 +722,7 @@ async function readWorkerSyncState() {
 
   const kv = getWorkerKvStore();
   if (!kv) return null;
-  const payload = (await kv.get(WORKER_SYNC_STATE_KV_KEY, {
+  const payload = (await kv.get(buildWorkerSyncStateKvKey(chainKey), {
     type: 'json',
   })) as SerializedStoredSyncState | null;
   return payload ? deserializeStoredSyncState(payload) : null;
@@ -661,14 +736,16 @@ async function writeWorkerSyncState(document: StoredSyncStateDocument) {
         .prepare(
           `INSERT INTO sync_state (
             key,
+            chain_key,
             sync_started_from,
             last_synced_block,
             latest_known_block,
             last_sync_status,
             last_sync_error,
             updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(key) DO UPDATE SET
+            chain_key = excluded.chain_key,
             sync_started_from = excluded.sync_started_from,
             last_synced_block = excluded.last_synced_block,
             latest_known_block = excluded.latest_known_block,
@@ -678,6 +755,7 @@ async function writeWorkerSyncState(document: StoredSyncStateDocument) {
         )
         .bind(
           document.key,
+          document.chainKey,
           document.syncStartedFrom,
           document.lastSyncedBlock,
           document.latestKnownBlock,
@@ -695,7 +773,7 @@ async function writeWorkerSyncState(document: StoredSyncStateDocument) {
   const kv = getWorkerKvStore();
   if (!kv) return false;
   try {
-    await kv.put(WORKER_SYNC_STATE_KV_KEY, JSON.stringify(serializeStoredSyncState(document)));
+    await kv.put(buildWorkerSyncStateKvKey(document.chainKey), JSON.stringify(serializeStoredSyncState(document)));
     return true;
   } catch {
     return false;
@@ -735,10 +813,11 @@ function envBigInt(name: string, fallback: bigint) {
   }
 }
 
-function quoteSymbolFromAddress(address: string) {
+function quoteSymbolFromAddress(address: string, chainKey: ChainKey) {
+  const chain = getChainConfig(chainKey);
   const normalized = address.toLowerCase();
-  if (normalized === '0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c') return 'WBNB';
-  if (normalized === '0x55d398326f99059ff775485246999027b3197955') return 'USDT';
+  if (normalized === chain.wrappedNativeToken) return chain.wrappedNativeSymbol;
+  if (normalized === chain.stableToken) return chain.stableSymbol;
   return 'TOKEN';
 }
 
@@ -830,7 +909,10 @@ function extractImageUrl(metadataURI?: string) {
 }
 
 function toTokenRecord(document: StoredTokenDocument): TokenRecord {
+  const chain = getChainConfig(document.chainKey);
   return {
+    chainKey: document.chainKey,
+    chainId: document.chainId,
     address: document.address,
     name: document.name,
     symbol: document.symbol,
@@ -857,10 +939,12 @@ function toTokenRecord(document: StoredTokenDocument): TokenRecord {
     imageUrl: extractImageUrl(document.metadataURI),
     feeTier: document.feeTier,
     launchedAt: document.launchedAt.toISOString(),
+    explorerBaseUrl: chain.explorerBaseUrl,
   };
 }
 
 function buildOverview(tokens: TokenRecord[], fallback: FallbackOverview) {
+  const fallbackChainKey = normalizeChainKey(tokens[0]?.chainKey ?? fallback.chain.toLowerCase());
   const sortedTokens = sortTokenRecords(tokens, (left, right) => {
     return new Date(right.launchedAt).getTime() - new Date(left.launchedAt).getTime();
   });
@@ -868,6 +952,8 @@ function buildOverview(tokens: TokenRecord[], fallback: FallbackOverview) {
     return right.volume24h + right.marketCap - (left.volume24h + left.marketCap);
   });
   return {
+    chainKey: fallbackChainKey,
+    chainId: tokens[0]?.chainId ?? getChainConfig(fallbackChainKey).chainId,
     chain: fallback.chain,
     launchedCount: sortedTokens.length,
     totalVolume24h: sortedTokens.reduce((sum, token) => sum + token.volume24h, 0),
@@ -938,22 +1024,24 @@ async function getMongoConnection() {
   });
 }
 
-async function readStoredTokens() {
-  const workerTokens = await readWorkerStoredTokens();
+async function readStoredTokens(chainKey: ChainKey) {
+  const workerTokens = await readWorkerStoredTokens(chainKey);
   if (workerTokens) {
     const mergedTokens = new Map<string, StoredTokenDocument>();
     for (const token of workerTokens) {
-      mergedTokens.set(token.address, token);
+      mergedTokens.set(buildTokenStorageKey(token.chainKey, token.address), token);
     }
     for (const [address, token] of inMemoryTokens.entries()) {
-      mergedTokens.set(address, token);
+      if (token.chainKey === chainKey) {
+        mergedTokens.set(address, token);
+      }
     }
     return [...mergedTokens.values()].sort((left, right) => right.launchedAt.getTime() - left.launchedAt.getTime());
   }
 
   const connection = await getMongoConnection();
   if (connection) {
-    const rows = await StoredTokenModel.find().sort({ launchedAt: -1 }).lean();
+    const rows = await StoredTokenModel.find({ chainKey }).sort({ launchedAt: -1 }).lean();
     // #region debug-point C:read-stored-tokens-mongo
     emitDebug('C', 'server/src/tokenRegistry.ts:readStoredTokens:mongo', '[DEBUG] Read stored tokens from MongoDB', {
       count: rows.length,
@@ -977,10 +1065,10 @@ async function writeStoredToken(document: StoredTokenDocument) {
   const hasWorkerStorage = Boolean(getWorkerD1Store() || getWorkerKvStore());
   if (hasWorkerStorage) {
     if (await writeWorkerStoredToken(document)) {
-      inMemoryTokens.set(document.address.toLowerCase(), document);
+      inMemoryTokens.set(buildTokenStorageKey(document.chainKey, document.address), document);
       return;
     }
-    inMemoryTokens.set(document.address.toLowerCase(), document);
+    inMemoryTokens.set(buildTokenStorageKey(document.chainKey, document.address), document);
   } else {
     const connection = await getMongoConnection();
     if (connection) {
@@ -991,7 +1079,7 @@ async function writeStoredToken(document: StoredTokenDocument) {
       });
       // #endregion
       await StoredTokenModel.findOneAndUpdate(
-        { address: document.address },
+        { chainKey: document.chainKey, address: document.address },
         { ...document, updatedAt: new Date() },
         { upsert: true, setDefaultsOnInsert: true },
       );
@@ -1002,34 +1090,34 @@ async function writeStoredToken(document: StoredTokenDocument) {
         symbol: document.symbol,
       });
       // #endregion
-      inMemoryTokens.set(document.address.toLowerCase(), document);
+      inMemoryTokens.set(buildTokenStorageKey(document.chainKey, document.address), document);
     }
   }
 
   const redis = await getRedisClient();
   if (redis) {
     await Promise.allSettled([
-      redis.del('eagle:market-overview'),
-      redis.del(`eagle:token:${document.address.toLowerCase()}`),
+      redis.del(`eagle:market-overview:${document.chainKey}`),
+      redis.del(`eagle:token:${document.chainKey}:${document.address.toLowerCase()}`),
     ]);
   }
 }
 
-async function readStoredToken(address: string) {
+async function readStoredToken(address: string, chainKey: ChainKey) {
   const normalized = address.toLowerCase();
-  const workerToken = await readWorkerStoredToken(normalized);
+  const workerToken = await readWorkerStoredToken(normalized, chainKey);
   if (workerToken) {
     return workerToken;
   }
 
-  const workerTokens = await readWorkerStoredTokens();
+  const workerTokens = await readWorkerStoredTokens(chainKey);
   if (workerTokens) {
     return null;
   }
 
   const connection = await getMongoConnection();
   if (connection) {
-    const row = await StoredTokenModel.findOne({ address: normalized }).lean();
+    const row = await StoredTokenModel.findOne({ chainKey, address: normalized }).lean();
     if (!row) return null;
     return {
       ...row,
@@ -1037,30 +1125,31 @@ async function readStoredToken(address: string) {
       updatedAt: new Date(row.updatedAt),
     } as StoredTokenDocument;
   }
-  return inMemoryTokens.get(normalized) ?? null;
+  return inMemoryTokens.get(buildTokenStorageKey(chainKey, normalized)) ?? null;
 }
 
-async function readSyncState() {
-  const workerState = await readWorkerSyncState();
+async function readSyncState(chainKey: ChainKey) {
+  const workerState = await readWorkerSyncState(chainKey);
   if (workerState) {
     return workerState;
   }
 
   const connection = await getMongoConnection();
   if (connection) {
-    const row = await StoredSyncStateModel.findOne({ key: FACTORY_SYNC_STATE_KEY }).lean();
+    const row = await StoredSyncStateModel.findOne({ key: getFactorySyncStateKey(chainKey) }).lean();
     if (!row) return null;
     return {
       ...row,
       updatedAt: new Date(row.updatedAt),
     } as StoredSyncStateDocument;
   }
-  return inMemorySyncState;
+  return inMemorySyncState?.chainKey === chainKey ? inMemorySyncState : null;
 }
 
-async function writeSyncState(update: Partial<StoredSyncStateDocument> & { key?: string }) {
+async function writeSyncState(chainKey: ChainKey, update: Partial<StoredSyncStateDocument> & { key?: string }) {
   const nextState: StoredSyncStateDocument = {
-    key: update.key ?? FACTORY_SYNC_STATE_KEY,
+    key: update.key ?? getFactorySyncStateKey(chainKey),
+    chainKey,
     syncStartedFrom: update.syncStartedFrom ?? '0',
     lastSyncedBlock: update.lastSyncedBlock ?? '0',
     latestKnownBlock: update.latestKnownBlock ?? '0',
@@ -1085,9 +1174,9 @@ async function writeSyncState(update: Partial<StoredSyncStateDocument> & { key?:
   }
 }
 
-async function resetSyncState(startBlock: bigint) {
-  await writeSyncState({
-    key: FACTORY_SYNC_STATE_KEY,
+async function resetSyncState(chainKey: ChainKey, startBlock: bigint) {
+  await writeSyncState(chainKey, {
+    key: getFactorySyncStateKey(chainKey),
     syncStartedFrom: startBlock.toString(),
     lastSyncedBlock: (startBlock > 0n ? startBlock - 1n : 0n).toString(),
     latestKnownBlock: '0',
@@ -1097,7 +1186,8 @@ async function resetSyncState(startBlock: bigint) {
   });
 }
 
-async function fetchDexScreenerSnapshot(tokenAddress: string) {
+async function fetchDexScreenerSnapshot(tokenAddress: string, chainKey: ChainKey) {
+  const chain = getChainConfig(chainKey);
   try {
     const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${tokenAddress}`, {
       signal: AbortSignal.timeout(2500),
@@ -1118,7 +1208,7 @@ async function fetchDexScreenerSnapshot(tokenAddress: string) {
       }>;
     };
 
-    const pairs = (payload.pairs ?? []).filter((pair) => pair.chainId === 'bsc');
+    const pairs = (payload.pairs ?? []).filter((pair) => pair.chainId === chain.dexscreenerChainId);
     if (!pairs.length) return null;
     const bestPair = [...pairs].sort(
       (left, right) => Number(right.liquidity?.usd ?? 0) - Number(left.liquidity?.usd ?? 0),
@@ -1150,18 +1240,22 @@ function validateRegisterPayload(payload: RegisterTokenPayload) {
 }
 
 async function makeStoredToken(payload: RegisterTokenPayload): Promise<StoredTokenDocument> {
+  const chainKey = normalizeChainKey(payload.chainKey);
+  const chain = getChainConfig(chainKey);
   const launchedAt = payload.launchedAt ? new Date(payload.launchedAt) : new Date();
   const normalizedAddress = normalizeAddress(payload.address);
   const normalizedCreator = normalizeAddress(payload.creator);
   const normalizedPool = normalizeAddress(payload.poolAddress);
   const normalizedQuote = normalizeAddress(payload.quoteToken);
-  const dexSnapshot = await fetchDexScreenerSnapshot(normalizedAddress);
+  const dexSnapshot = await fetchDexScreenerSnapshot(normalizedAddress, chainKey);
   const numericSupply = toNumericSupply(payload.totalSupply);
   const fallbackPrice = dexSnapshot?.priceUsd && dexSnapshot.priceUsd > 0 ? dexSnapshot.priceUsd : DEFAULT_QUOTE_TOKEN_PRICE;
   const marketCap = dexSnapshot?.marketCap && dexSnapshot.marketCap > 0 ? dexSnapshot.marketCap : numericSupply * fallbackPrice;
-  const quoteSymbol = payload.quoteSymbol?.trim() || dexSnapshot?.quoteSymbol || quoteSymbolFromAddress(normalizedQuote);
+  const quoteSymbol = payload.quoteSymbol?.trim() || dexSnapshot?.quoteSymbol || quoteSymbolFromAddress(normalizedQuote, chainKey);
 
   return {
+    chainKey,
+    chainId: chain.chainId,
     address: normalizedAddress.toLowerCase(),
     name: payload.name.trim(),
     symbol: payload.symbol.trim(),
@@ -1188,9 +1282,9 @@ async function makeStoredToken(payload: RegisterTokenPayload): Promise<StoredTok
   };
 }
 
-function resolvedFactoryStartBlock(latestBlock: bigint) {
+function resolvedFactoryStartBlock(chainKey: ChainKey, latestBlock: bigint) {
   const blockWindow = envBigInt('EAGLE_SYNC_BLOCK_WINDOW', DEFAULT_SYNC_BLOCK_WINDOW);
-  const startBlockEnv = process.env.EAGLE_FACTORY_START_BLOCK?.trim();
+  const startBlockEnv = getConfiguredStartBlock(chainKey);
   if (startBlockEnv) {
     try {
       return BigInt(startBlockEnv);
@@ -1201,11 +1295,12 @@ function resolvedFactoryStartBlock(latestBlock: bigint) {
   return latestBlock > blockWindow ? latestBlock - blockWindow : 0n;
 }
 
-async function syncFactoryLaunchesInternal(options?: { force?: boolean; reset?: boolean }) {
-  const rpcUrl = process.env.BSC_RPC_URL?.trim();
+async function syncFactoryLaunchesInternal(chainKey: ChainKey, options?: { force?: boolean; reset?: boolean }) {
+  const rpcUrl = getConfiguredRpcUrl(chainKey);
   // #region debug-point D:sync-start
   emitDebug('D', 'server/src/tokenRegistry.ts:syncFactoryLaunchesInternal:start', '[DEBUG] Factory sync invoked', {
     hasRpcUrl: Boolean(rpcUrl),
+    chainKey,
     force: Boolean(options?.force),
     reset: Boolean(options?.reset),
   });
@@ -1220,10 +1315,12 @@ async function syncFactoryLaunchesInternal(options?: { force?: boolean; reset?: 
 
   const client = createPublicClient({ transport: http(rpcUrl) });
   const latestBlock = await client.getBlockNumber();
-  const startBlock = resolvedFactoryStartBlock(latestBlock);
+  const startBlock = resolvedFactoryStartBlock(chainKey, latestBlock);
   const chunkSize = envBigInt('EAGLE_SYNC_CHUNK_SIZE', DEFAULT_SYNC_CHUNK_SIZE);
   const maxChunksPerRun = envNumber('EAGLE_SYNC_MAX_CHUNKS_PER_RUN', DEFAULT_SYNC_MAX_CHUNKS_PER_RUN);
-  const factoryAddress = normalizeAddress(process.env.EAGLE_FACTORY_ADDRESS?.trim() || DEFAULT_FACTORY_ADDRESS);
+  const configuredFactoryAddress = getConfiguredFactoryAddress(chainKey);
+  if (!configuredFactoryAddress) return;
+  const factoryAddress = normalizeAddress(configuredFactoryAddress);
   // #region debug-point D:sync-config
   emitDebug('D', 'server/src/tokenRegistry.ts:syncFactoryLaunchesInternal:config', '[DEBUG] Factory sync config resolved', {
     latestBlock: latestBlock.toString(),
@@ -1235,19 +1332,19 @@ async function syncFactoryLaunchesInternal(options?: { force?: boolean; reset?: 
   });
   // #endregion
 
-  const existingState = options?.reset ? null : await readSyncState();
+  const existingState = options?.reset ? null : await readSyncState(chainKey);
   if (options?.reset || (existingState && BigInt(existingState.syncStartedFrom) > startBlock)) {
-    await resetSyncState(startBlock);
+    await resetSyncState(chainKey, startBlock);
   }
 
-  const syncState = (options?.reset ? null : existingState) ?? (await readSyncState());
+  const syncState = (options?.reset ? null : existingState) ?? (await readSyncState(chainKey));
   let nextFromBlock = syncState ? BigInt(syncState.lastSyncedBlock) + 1n : startBlock;
   if (nextFromBlock < startBlock) {
     nextFromBlock = startBlock;
   }
 
-  await writeSyncState({
-    key: FACTORY_SYNC_STATE_KEY,
+  await writeSyncState(chainKey, {
+    key: getFactorySyncStateKey(chainKey),
     syncStartedFrom: startBlock.toString(),
     lastSyncedBlock: syncState?.lastSyncedBlock ?? (startBlock > 0n ? (startBlock - 1n).toString() : '0'),
     latestKnownBlock: latestBlock.toString(),
@@ -1288,11 +1385,12 @@ async function syncFactoryLaunchesInternal(options?: { force?: boolean; reset?: 
         }
         const block = await client.getBlock({ blockNumber: log.blockNumber });
         await registerTokenLaunch({
+          chainKey,
           address: args.token,
           creator: args.creator,
           poolAddress: args.pool,
           quoteToken: args.quoteToken,
-          quoteSymbol: quoteSymbolFromAddress(args.quoteToken),
+          quoteSymbol: quoteSymbolFromAddress(args.quoteToken, chainKey),
           name: args.name,
           symbol: args.symbol,
           totalSupply: args.totalSupply.toString(),
@@ -1309,8 +1407,8 @@ async function syncFactoryLaunchesInternal(options?: { force?: boolean; reset?: 
         // #endregion
       }
 
-      await writeSyncState({
-        key: FACTORY_SYNC_STATE_KEY,
+      await writeSyncState(chainKey, {
+        key: getFactorySyncStateKey(chainKey),
         syncStartedFrom: startBlock.toString(),
         lastSyncedBlock: toBlock.toString(),
         latestKnownBlock: latestBlock.toString(),
@@ -1329,8 +1427,8 @@ async function syncFactoryLaunchesInternal(options?: { force?: boolean; reset?: 
       error: message,
     });
     // #endregion
-    await writeSyncState({
-      key: FACTORY_SYNC_STATE_KEY,
+    await writeSyncState(chainKey, {
+      key: getFactorySyncStateKey(chainKey),
       syncStartedFrom: startBlock.toString(),
       lastSyncedBlock: (nextFromBlock > startBlock ? nextFromBlock - 1n : startBlock > 0n ? startBlock - 1n : 0n).toString(),
       latestKnownBlock: latestBlock.toString(),
@@ -1342,20 +1440,20 @@ async function syncFactoryLaunchesInternal(options?: { force?: boolean; reset?: 
   }
 }
 
-export async function syncFactoryLaunches(options?: { force?: boolean; reset?: boolean }) {
+export async function syncFactoryLaunches(chainKey: ChainKey = 'bsc', options?: { force?: boolean; reset?: boolean }) {
   if (!syncInFlight) {
-    syncInFlight = syncFactoryLaunchesInternal(options).finally(() => {
+    syncInFlight = syncFactoryLaunchesInternal(chainKey, options).finally(() => {
       syncInFlight = null;
     });
   }
   return syncInFlight;
 }
 
-export async function getFactorySyncStatus() {
-  const state = await readSyncState();
+export async function getFactorySyncStatus(chainKey: ChainKey = 'bsc') {
+  const state = await readSyncState(chainKey);
   if (!state) {
     return {
-      key: FACTORY_SYNC_STATE_KEY,
+      key: getFactorySyncStateKey(chainKey),
       syncStartedFrom: '0',
       lastSyncedBlock: '0',
       latestKnownBlock: '0',
@@ -1367,9 +1465,10 @@ export async function getFactorySyncStatus() {
   return toSyncStatus(state);
 }
 
-export async function forceFactorySync(options?: { reset?: boolean }) {
-  await syncFactoryLaunches({ force: true, reset: options?.reset });
-  return getFactorySyncStatus();
+export async function forceFactorySync(options?: { reset?: boolean; chainKey?: ChainKey }) {
+  const chainKey = normalizeChainKey(options?.chainKey);
+  await syncFactoryLaunches(chainKey, { force: true, reset: options?.reset });
+  return getFactorySyncStatus(chainKey);
 }
 
 export function getRuntimeDiagnostics(): RuntimeDiagnostics {
@@ -1413,20 +1512,20 @@ export async function registerTokenLaunch(payload: RegisterTokenPayload) {
   return toTokenRecord(document);
 }
 
-export async function getMarketOverview(fallback: FallbackOverview) {
+export async function getMarketOverview(fallback: FallbackOverview, chainKey: ChainKey = 'bsc') {
   if (!isWorkerRuntime()) {
-    await Promise.allSettled([syncFactoryLaunches()]);
+    await Promise.allSettled([syncFactoryLaunches(chainKey)]);
   }
 
   const redis = await getRedisClient();
   if (redis) {
-    const cached = await redis.get('eagle:market-overview');
+    const cached = await redis.get(`eagle:market-overview:${chainKey}`);
     if (cached) {
       return JSON.parse(cached) as MarketOverview;
     }
   }
 
-  const stored = await readStoredTokens();
+  const stored = await readStoredTokens(chainKey);
   const overview = buildOverview(stored.map(toTokenRecord), fallback);
   // #region debug-point B:get-market-overview-result
   emitDebug('B', 'server/src/tokenRegistry.ts:getMarketOverview:result', '[DEBUG] Market overview built', {
@@ -1437,24 +1536,24 @@ export async function getMarketOverview(fallback: FallbackOverview) {
   // #endregion
 
   if (redis) {
-    await redis.set('eagle:market-overview', JSON.stringify(overview), {
+    await redis.set(`eagle:market-overview:${chainKey}`, JSON.stringify(overview), {
       EX: DEFAULT_CACHE_TTL_SECONDS,
     });
   }
   return overview;
 }
 
-export async function getTokenDetail(address: string, _fallbackTokens: FallbackToken[]) {
+export async function getTokenDetail(address: string, _fallbackTokens: FallbackToken[], chainKey: ChainKey = 'bsc') {
   if (!isAddress(address)) {
     throw new Error('Invalid token address');
   }
 
   if (!isWorkerRuntime()) {
-    await Promise.allSettled([syncFactoryLaunches()]);
+    await Promise.allSettled([syncFactoryLaunches(chainKey)]);
   }
 
   const redis = await getRedisClient();
-  const cacheKey = `eagle:token:${address.toLowerCase()}`;
+  const cacheKey = `eagle:token:${chainKey}:${address.toLowerCase()}`;
   if (redis) {
     const cached = await redis.get(cacheKey);
     if (cached) {
@@ -1462,7 +1561,7 @@ export async function getTokenDetail(address: string, _fallbackTokens: FallbackT
     }
   }
 
-  const stored = await readStoredToken(address);
+  const stored = await readStoredToken(address, chainKey);
   if (!stored) {
     throw new Error('Token not found');
   }
@@ -1477,7 +1576,7 @@ export async function getTokenDetail(address: string, _fallbackTokens: FallbackT
   return token;
 }
 
-export async function getTokenTrades(address: string, fallbackTokens: FallbackToken[]) {
-  const token = await getTokenDetail(address, fallbackTokens);
+export async function getTokenTrades(address: string, fallbackTokens: FallbackToken[], chainKey: ChainKey = 'bsc') {
+  const token = await getTokenDetail(address, fallbackTokens, chainKey);
   return token.trades;
 }

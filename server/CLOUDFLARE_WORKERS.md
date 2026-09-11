@@ -30,6 +30,9 @@ wrangler secret put MONGODB_URI
 wrangler secret put BSC_RPC_URL
 wrangler secret put EAGLE_FACTORY_ADDRESS
 wrangler secret put EAGLE_FACTORY_START_BLOCK
+wrangler secret put BASE_RPC_URL
+wrangler secret put BASE_FACTORY_ADDRESS
+wrangler secret put BASE_FACTORY_START_BLOCK
 wrangler secret put EAGLE_SYNC_CHUNK_SIZE
 wrangler secret put EAGLE_SYNC_MAX_CHUNKS_PER_RUN
 wrangler secret put TOKEN_SYNC_COOLDOWN_MS
@@ -74,7 +77,10 @@ npx wrangler d1 create eagle-token-storage
 npx wrangler d1 migrations apply eagle-token-storage
 ```
 
-The schema file lives at `migrations/0001_init_token_storage.sql`.
+The schema files live at:
+
+- `migrations/0001_init_token_storage.sql`
+- `migrations/0002_add_multichain_support.sql`
 
 ## Deploy
 
@@ -85,6 +91,7 @@ npm run deploy:worker
 ## Notes
 
 - D1 is the primary Workers storage target for `tokens` and `sync_state`.
+- `GET /api/tokens`, `GET /api/tokens/:address`, `GET /api/tokens/sync-status`, and `POST /api/tokens/sync` now accept `?chain=bsc|base`.
 - Redis is intentionally disabled in the Workers runtime in the current implementation.
 - MongoDB is still used, but the runtime uses smaller pool and timeout settings to reduce Workers-side connection pressure.
 - If `GET /api/tokens/sync-status` stays at zeroes after deploy, trigger:

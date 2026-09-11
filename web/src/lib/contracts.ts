@@ -1,13 +1,28 @@
-import { erc20Abi } from 'viem';
+import { type Address, erc20Abi } from 'viem';
+import { getChainConfig, type ChainKey } from '@/lib/chains';
 
-export const eagleContracts = {
-  chainId: 56,
-  factory: '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE',
-  locker: '0x01ec131cF83F2978780D969b79f4839090618187',
-  distributorFactory: '0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726',
-  wbnb: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
-  usdt: '0x55d398326f99059fF775485246999027B3197955',
-} as const;
+export type EagleContracts = {
+  chainId: number;
+  factory?: Address;
+  locker?: Address;
+  distributorFactory?: Address;
+  wrappedNativeToken: Address;
+  stableToken: Address;
+};
+
+export function getEagleContracts(chainKey: ChainKey): EagleContracts {
+  const config = getChainConfig(chainKey);
+  return {
+    chainId: config.chainId,
+    factory: config.factory,
+    locker: config.locker,
+    distributorFactory: config.distributorFactory,
+    wrappedNativeToken: config.wrappedNativeToken,
+    stableToken: config.stableToken,
+  };
+}
+
+export const eagleContracts = getEagleContracts('bsc');
 
 export const eagleFactoryAbi = [
   {

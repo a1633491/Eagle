@@ -6,6 +6,7 @@ import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useReadContract } from 'wagmi';
 import { isAddress } from 'viem';
 import { LaunchSubmitActions } from '@/components/launch-submit-actions';
+import { getChainConfig, withLangAndChain, type ChainKey } from '@/lib/chains';
 import { eagleErc20Abi } from '@/lib/contracts';
 import { t, withLang, type Lang } from '@/lib/i18n';
 
@@ -140,7 +141,8 @@ const copy = {
   },
 } as const;
 
-export function LaunchBuilder({ lang }: { lang: Lang }) {
+export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainKey }) {
+  const chain = getChainConfig(chainKey);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState('');
   const [ticker, setTicker] = useState('');
@@ -184,18 +186,19 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
   });
 
   const pairLabel = useMemo(() => {
-    if (pair === 'USDT') return 'USDT';
+    if (pair === 'USDT') return chain.stableSymbol;
     if (pair === 'ANY') return customQuoteSymbol ?? 'TOKEN';
-    return 'BNB';
-  }, [customQuoteSymbol, pair]);
+    return chain.nativeSymbol;
+  }, [chain.nativeSymbol, chain.stableSymbol, customQuoteSymbol, pair]);
 
   const locale = copy[lang];
   const feeTargetLabel = feeTarget === 'wallet' ? t(lang, 'feeWallet') : locale.holders;
   const localizedPairOptions = pairOptions.map((option) => ({
     ...option,
-    label: option.key === 'ANY' ? t(lang, 'anyBscToken') : option.label,
+    label: option.key === 'ANY' ? chain.anyTokenLabel : option.key === 'BNB' ? chain.nativeSymbol : chain.stableSymbol,
     subtitle: option.key === 'BNB' ? locale.native : option.key === 'USDT' ? locale.stable : option.subtitle,
   }));
+  const chainMainnetLabel = `${chain.name} mainnet Chain ${chain.chainId}`;
 
   async function uploadImage(file: File) {
     const formData = new FormData();
@@ -270,7 +273,7 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
             {t(lang, 'makeItYoursLead')}
           </p>
           <Link
-            href={withLang('/docs#getting-started', lang)}
+            href={withLangAndChain('/docs#getting-started', lang, chainKey)}
             className='mt-5 inline-flex h-10 items-center rounded-full border border-white/10 bg-white/[0.04] px-4 text-sm text-[#f1e4b7] transition hover:bg-white/[0.06]'
           >
             {t(lang, 'howItWorks')}
@@ -473,11 +476,11 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
               <input
                 value={quoteTokenInput}
                 onChange={(event) => setQuoteTokenInput(event.target.value)}
-                placeholder={locale.quoteTokenPlaceholder}
+                placeholder={locale.quoteTokenPlaceholder.replaceAll('BSC', chain.shortName)}
                 className='w-full bg-transparent text-sm text-[#f3f1e8] outline-none placeholder:text-[#6f7468]'
               />
             ) : (
-              <span>{pair === 'BNB' ? 'WBNB' : 'USDT'}</span>
+              <span>{pair === 'BNB' ? chain.wrappedNativeSymbol : chain.stableSymbol}</span>
             )}
           </div>
 
@@ -505,7 +508,7 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
             </div>
             <div className='flex items-center justify-between gap-4'>
               <span className='text-sm text-[#8f9482]'>{t(lang, 'launchingOn')}</span>
-              <span className='text-sm font-medium text-[#f3f1e8]'>{locale.chainMainnet}</span>
+              <span className='text-sm font-medium text-[#f3f1e8]'>{chainMainnetLabel}</span>
             </div>
             <div className='rounded-[18px] border border-white/8 bg-[#111310] p-4'>
               <p className='text-sm font-medium text-[#f3f1e8]'>{t(lang, 'launchFeelsLikeYou')}</p>
@@ -617,11 +620,12 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
                 ) : null}
               </div>
               <p className='mt-3 text-sm leading-7 text-[#8f9482]'>
-                {t(lang, 'launchesLiveOnBsc')}
+                Launches are live on {chain.name}. Review your token to launch it from your wallet.
               </p>
             </div>
             <LaunchSubmitActions
               lang={lang}
+              chainKey={chainKey}
               name={name}
               ticker={ticker}
               story={story}
@@ -650,7 +654,7 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
               <p className='text-xs font-medium uppercase tracking-[0.18em] text-[#8f9482]'>{t(lang, 'livePreview')}</p>
               <p className='mt-1 text-sm text-[#a8ad99]'>{t(lang, 'yourIdeaComingToLife')}</p>
             </div>
-            <span className='rounded-full border border-white/8 bg-[#131512] px-3 py-1 text-xs text-[#d8c483]'>◆ BNB CHAIN</span>
+            <span className='rounded-full border border-white/8 bg-[#131512] px-3 py-1 text-xs text-[#d8c483]'>◆ {chain.name.toUpperCase()}</span>
           </div>
 
           <div className='rounded-[24px] border border-white/8 bg-[#131512] p-5'>
@@ -676,7 +680,7 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
             <div className='mt-4 grid gap-3 rounded-[18px] border border-white/8 bg-[#10120f] p-4'>
               <div className='flex items-center justify-between text-[14px]'>
                 <span className='text-[#8f9482]'>{t(lang, 'network')}</span>
-                <span className='text-[#f3f1e8]'>{t(lang, 'bnbChain')}</span>
+                <span className='text-[#f3f1e8]'>{chain.name}</span>
               </div>
               <div className='flex items-center justify-between text-[14px]'>
                 <span className='text-[#8f9482]'>{t(lang, 'status')}</span>
@@ -705,15 +709,15 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
             <p className='text-sm leading-7 text-[#a8ad99]'>{t(lang, 'makeSomething')}</p>
 
             <div className='mt-5 flex flex-wrap gap-2 text-sm'>
-              <a href='https://www.bnbchain.org/' className='inline-flex h-10 items-center gap-1 rounded-full border border-white/10 px-3 py-2 text-[#d8c483] transition hover:bg-white/[0.04]'>
+              <a href={chain.docsWebsite} className='inline-flex h-10 items-center gap-1 rounded-full border border-white/10 px-3 py-2 text-[#d8c483] transition hover:bg-white/[0.04]'>
                 <Triangle className='h-3.5 w-3.5 fill-current stroke-none' />
               </a>
-              <a href='https://www.bnbchain.org/' className='inline-flex h-10 items-center gap-1 rounded-full border border-white/10 px-3 py-2 text-[#d8c483] transition hover:bg-white/[0.04]'>
+              <a href={chain.docsWebsite} className='inline-flex h-10 items-center gap-1 rounded-full border border-white/10 px-3 py-2 text-[#d8c483] transition hover:bg-white/[0.04]'>
                 <Globe className='h-3.5 w-3.5' />
                 {locale.builtForCreators}
               </a>
-              <a href='https://www.bnbchain.org/' className='inline-flex h-10 items-center gap-1 rounded-full border border-white/10 px-3 py-2 text-[#d8c483] transition hover:bg-white/[0.04]'>
-                {locale.poweredByBnbChain}
+              <a href={chain.docsWebsite} className='inline-flex h-10 items-center gap-1 rounded-full border border-white/10 px-3 py-2 text-[#d8c483] transition hover:bg-white/[0.04]'>
+                Powered by {chain.name}.
               </a>
             </div>
           </div>

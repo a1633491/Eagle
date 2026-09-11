@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { MarketHeader } from '@/components/market-header';
 import { getMarketOverview } from '@/lib/api';
+import { normalizeChainKey, withLangAndChain } from '@/lib/chains';
 import { normalizeLang, t, withLang, type Lang } from '@/lib/i18n';
 
 function getDocsContent(lang: Lang) {
@@ -255,13 +256,14 @@ function getDocsContent(lang: Lang) {
 }
 
 type DocsPageProps = {
-  searchParams: Promise<{ lang?: string }>;
+  searchParams: Promise<{ lang?: string; chain?: string }>;
 };
 
 export default async function DocsPage({ searchParams }: DocsPageProps) {
   const params = await searchParams;
   const lang = normalizeLang(params.lang);
-  const overview = await getMarketOverview();
+  const chainKey = normalizeChainKey(params.chain);
+  const overview = await getMarketOverview(chainKey);
   const { navItems, sections } = getDocsContent(lang);
 
   return (
@@ -337,7 +339,7 @@ export default async function DocsPage({ searchParams }: DocsPageProps) {
         <section className='rounded-[28px] border border-white/8 bg-[#1a1c19]/96 p-5.5'>
           <p className='text-sm text-[#8f9482]'>{t(lang, 'yourIdeaIsNext')}</p>
           <Link
-            href={withLang('/launch', lang)}
+            href={withLangAndChain('/launch', lang, chainKey)}
             className='mt-4 inline-flex h-11 items-center rounded-full border border-[#f6e3ac66] bg-[linear-gradient(145deg,#f7e8ba,#d1b773)] px-5 text-sm font-medium text-[#342d1a] transition hover:brightness-105'
           >
             {t(lang, 'createAToken')}

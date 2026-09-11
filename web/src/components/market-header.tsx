@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ChevronDown, Search } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { EagleMark } from '@/components/eagle-mark';
+import { getChainConfig, normalizeChainKey, type ChainKey } from '@/lib/chains';
 import { MarketOverview } from '@/lib/types';
 import { WalletStatus } from '@/components/wallet-status';
 import { normalizeLang, t, type Lang } from '@/lib/i18n';
@@ -13,10 +14,13 @@ export function MarketHeader({ overview }: { overview: MarketOverview }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const lang = normalizeLang(searchParams.get('lang') ?? undefined);
+  const chainKey = normalizeChainKey(searchParams.get('chain') ?? undefined);
+  const chain = getChainConfig(chainKey);
 
   const withLang = (href: string, nextLang = lang) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('lang', nextLang);
+    params.set('chain', chainKey);
     const query = params.toString();
     return query ? `${href}?${query}` : href;
   };
@@ -24,6 +28,13 @@ export function MarketHeader({ overview }: { overview: MarketOverview }) {
   const switchLangHref = (nextLang: Lang) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('lang', nextLang);
+    const query = params.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  };
+
+  const switchChainHref = (nextChain: ChainKey) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('chain', nextChain);
     const query = params.toString();
     return query ? `${pathname}?${query}` : pathname;
   };
@@ -37,8 +48,20 @@ export function MarketHeader({ overview }: { overview: MarketOverview }) {
           </span>
           <span className="hidden text-[1.55rem] font-semibold tracking-[-0.07em] min-[380px]:inline">Eagle.</span>
         </Link>
-        <div className="hidden h-10 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 text-[13px] text-[#d2d5c9] md:flex">
-          <span>{overview.chain}</span>
+        <div className="relative hidden h-10 items-center rounded-full border border-white/10 bg-white/[0.04] md:flex">
+          <select
+            aria-label="Network"
+            value={chainKey}
+            onChange={(event) => router.push(switchChainHref(event.target.value as ChainKey))}
+            className="h-10 appearance-none rounded-full bg-transparent pl-3.5 pr-9 text-[12px] text-[#d2d5c9] outline-none"
+          >
+            <option value="bsc" className="bg-[#151714] text-[#f1e4b7]">
+              BNB Chain
+            </option>
+            <option value="base" className="bg-[#151714] text-[#f1e4b7]">
+              Base
+            </option>
+          </select>
           <ChevronDown className="h-4 w-4 text-[#a5aa99]" />
         </div>
         <nav className="ml-2 hidden items-center gap-4.5 text-[13px] text-[#a6aa99] md:flex">
@@ -77,7 +100,7 @@ export function MarketHeader({ overview }: { overview: MarketOverview }) {
           </div>
           <div className="hidden h-10 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 text-[13px] text-[#9da28f] lg:flex">
             <Search className="h-4 w-4" />
-            {t(lang, 'search')}
+            {chain.shortName} · {t(lang, 'search')}
           </div>
           <WalletStatus />
         </div>

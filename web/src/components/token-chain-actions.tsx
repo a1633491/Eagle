@@ -3,9 +3,10 @@
 import { useMemo, useState } from 'react';
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from 'wagmi';
 import { type Address, formatUnits, isAddress, parseUnits, zeroAddress } from 'viem';
+import { getEagleContracts } from '@/lib/contracts';
 import { shorten } from '@/lib/format';
+import { type ChainKey } from '@/lib/chains';
 import {
-  eagleContracts,
   eagleDistributorFactoryAbi,
   eagleErc20Abi,
   eagleFactoryAbi,
@@ -92,8 +93,17 @@ function normalizeError(error: unknown, prefix: string) {
   return `${prefix}Unknown error`;
 }
 
-export function TokenChainActions({ lang, tokenAddress }: { lang: Lang; tokenAddress: string }) {
+export function TokenChainActions({
+  lang,
+  tokenAddress,
+  chainKey,
+}: {
+  lang: Lang;
+  tokenAddress: string;
+  chainKey: ChainKey;
+}) {
   const locale = copy[lang];
+  const eagleContracts = getEagleContracts(chainKey);
   const publicClient = usePublicClient();
   const { address, isConnected } = useAccount();
   const { writeContractAsync } = useWriteContract();
@@ -197,12 +207,12 @@ export function TokenChainActions({ lang, tokenAddress }: { lang: Lang; tokenAdd
   }
 
   async function handleCollect() {
-    if (!normalizedToken || !publicClient) return;
+    if (!normalizedToken || !publicClient || !eagleContracts.locker) return;
     await runAction(
       'collect',
       async () => {
         const hash = await writeContractAsync({
-          address: eagleContracts.locker,
+          address: eagleContracts.locker!,
           abi: eagleLiquidityLockerAbi,
           functionName: 'collectAllFees',
           args: [normalizedToken],
@@ -214,12 +224,12 @@ export function TokenChainActions({ lang, tokenAddress }: { lang: Lang; tokenAdd
   }
 
   async function handleClaim() {
-    if (!quoteToken || !address || !publicClient) return;
+    if (!quoteToken || !address || !publicClient || !eagleContracts.locker) return;
     await runAction(
       'claim',
       async () => {
         const hash = await writeContractAsync({
-          address: eagleContracts.locker,
+          address: eagleContracts.locker!,
           abi: eagleLiquidityLockerAbi,
           functionName: 'claimFees',
           args: [quoteToken, address],
@@ -231,12 +241,12 @@ export function TokenChainActions({ lang, tokenAddress }: { lang: Lang; tokenAdd
   }
 
   async function handleDistribute() {
-    if (!normalizedToken || parsedMinTokensOut === undefined || !publicClient) return;
+    if (!normalizedToken || parsedMinTokensOut === undefined || !publicClient || !eagleContracts.distributorFactory) return;
     await runAction(
       'distribute',
       async () => {
         const hash = await writeContractAsync({
-          address: eagleContracts.distributorFactory,
+          address: eagleContracts.distributorFactory!,
           abi: eagleDistributorFactoryAbi,
           functionName: 'distribute',
           args: [normalizedToken, parsedMinTokensOut],

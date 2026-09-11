@@ -1,21 +1,30 @@
 import { ApiResponse, MarketOverview, TokenDetail } from '@/lib/types';
+import { getChainConfig, normalizeChainKey, type ChainKey } from '@/lib/chains';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api';
 
-const emptyOverview: MarketOverview = {
-  chain: 'BNB Chain',
-  launchedCount: 0,
-  totalVolume24h: 0,
-  trending: [],
-  tokens: [],
-};
-
-function emptyTokenDetail(address: string): TokenDetail {
+function emptyOverview(chainKey: ChainKey): MarketOverview {
+  const config = getChainConfig(chainKey);
   return {
+    chainKey,
+    chainId: config.chainId,
+    chain: config.name,
+    launchedCount: 0,
+    totalVolume24h: 0,
+    trending: [],
+    tokens: [],
+  };
+}
+
+function emptyTokenDetail(address: string, chainKey: ChainKey): TokenDetail {
+  const config = getChainConfig(chainKey);
+  return {
+    chainKey,
+    chainId: config.chainId,
     address,
     name: 'Unknown Token',
     symbol: 'UNKNOWN',
-    quoteSymbol: 'WBNB',
+    quoteSymbol: config.wrappedNativeSymbol,
     priceUsd: 0,
     change24h: 0,
     marketCap: 0,
@@ -29,9 +38,10 @@ function emptyTokenDetail(address: string): TokenDetail {
     tags: [],
     totalSupply: '0 UNKNOWN',
     launchedDate: '',
-    pairLabel: 'UNKNOWN / WBNB',
+    pairLabel: `UNKNOWN / ${config.wrappedNativeSymbol}`,
     chart: [],
     trades: [],
+    explorerBaseUrl: config.explorerBaseUrl,
   };
 }
 
@@ -49,10 +59,12 @@ async function request<T>(path: string): Promise<T> {
   return payload.data;
 }
 
-export function getMarketOverview(): Promise<MarketOverview> {
-  return request<MarketOverview>('/tokens').catch(() => emptyOverview);
+export function getMarketOverview(chainKey?: string): Promise<MarketOverview> {
+  const normalized = normalizeChainKey(chainKey);
+  return request<MarketOverview>(`/tokens?chain=${normalized}`).catch(() => emptyOverview(normalized));
 }
 
-export function getTokenDetail(address: string): Promise<TokenDetail> {
-  return request<TokenDetail>(`/tokens/${address}`).catch(() => emptyTokenDetail(address));
+export function getTokenDetail(address: string, chainKey?: string): Promise<TokenDetail> {
+  const normalized = normalizeChainKey(chainKey);
+  return request<TokenDetail>(`/tokens/${address}?chain=${normalized}`).catch(() => emptyTokenDetail(address, normalized));
 }

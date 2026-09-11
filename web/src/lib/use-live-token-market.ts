@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { isAddress } from 'viem';
+import { getChainConfig, type ChainKey } from '@/lib/chains';
 
 export type LiveTokenMarket = {
   priceUsd?: number;
@@ -29,7 +30,7 @@ type DexPayload = {
   pairs?: DexPair[];
 };
 
-export function useLiveTokenMarket(tokenAddress: string | undefined, fallback?: LiveTokenMarket) {
+export function useLiveTokenMarket(tokenAddress: string | undefined, chainKey: ChainKey, fallback?: LiveTokenMarket) {
   const [market, setMarket] = useState<LiveTokenMarket | null>(fallback ?? null);
 
   useEffect(() => {
@@ -48,7 +49,7 @@ export function useLiveTokenMarket(tokenAddress: string | undefined, fallback?: 
         });
         if (!response.ok) return;
         const payload = (await response.json()) as DexPayload;
-        const pairs = (payload.pairs ?? []).filter((pair) => pair.chainId === 'bsc');
+        const pairs = (payload.pairs ?? []).filter((pair) => pair.chainId === getChainConfig(chainKey).dexscreenerChainId);
         if (!pairs.length) return;
         const bestPair = [...pairs].sort(
           (left, right) => Number(right.liquidity?.usd ?? 0) - Number(left.liquidity?.usd ?? 0),
@@ -81,7 +82,7 @@ export function useLiveTokenMarket(tokenAddress: string | undefined, fallback?: 
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [fallback, tokenAddress]);
+  }, [chainKey, fallback, tokenAddress]);
 
   return useMemo(() => market ?? fallback ?? {}, [fallback, market]);
 }

@@ -16,12 +16,13 @@ import {
 } from 'viem';
 import {
   defaultLaunchConfig,
-  eagleContracts,
   eagleDistributorFactoryAbi,
   eagleErc20Abi,
   eagleFactoryAbi,
+  getEagleContracts,
   tickSpacingByFeeTier,
 } from '@/lib/contracts';
+import { getChainConfig, type ChainKey } from '@/lib/chains';
 import { type Lang } from '@/lib/i18n';
 
 type PairKey = 'BNB' | 'USDT' | 'ANY';
@@ -29,6 +30,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/
 
 type LaunchSubmitActionsProps = {
   lang: Lang;
+  chainKey: ChainKey;
   name: string;
   ticker: string;
   story: string;
@@ -132,7 +134,7 @@ function normalizeError(error: unknown, prefix: string) {
   return `${prefix}Unknown error`;
 }
 
-async function fetchQuoteUsdPrice(token: Address) {
+async function fetchQuoteUsdPrice(token: Address, chainKey: ChainKey) {
   const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${token}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch quote price (${response.status})`);
@@ -154,7 +156,7 @@ async function fetchQuoteUsdPrice(token: Address) {
   let bestLiquidity = -1;
 
   for (const pair of payload.pairs ?? []) {
-    if (pair.chainId !== 'bsc') continue;
+    if (pair.chainId !== getChainConfig(chainKey).dexscreenerChainId) continue;
     const baseAddress = pair.baseToken?.address?.toLowerCase();
     const quoteAddress = pair.quoteToken?.address?.toLowerCase();
     const pairLiquidity = Number(pair.liquidity?.usd ?? 0);
@@ -220,6 +222,7 @@ async function queueAutomaticVerification(payload: {
 }
 
 async function registerLaunchedToken(payload: {
+  chainKey: ChainKey;
   address: Address;
   name: string;
   symbol: string;
@@ -278,6 +281,7 @@ async function registerLaunchedTokenWithRetry(
 
 export function LaunchSubmitActions({
   lang,
+  chainKey,
   name,
   ticker,
   story,
@@ -296,6 +300,8 @@ export function LaunchSubmitActions({
   initialBuyMinTokensOut,
 }: LaunchSubmitActionsProps) {
   const locale = copy[lang];
+  const chain = getChainConfig(chainKey);
+  const contracts = getEagleContracts(chainKey);
   const router = useRouter();
   const publicClient = usePublicClient();
   const { address, isConnected } = useAccount();
@@ -307,15 +313,18 @@ export function LaunchSubmitActions({
   const [quotePriceLoading, setQuotePriceLoading] = useState(false);
 
   const resolvedQuoteToken = useMemo<Address | undefined>(() => {
-    if (pair === 'BNB') return eagleContracts.wbnb;
-    if (pair === 'USDT') return eagleContracts.usdt;
+    if (pair === 'BNB') return contracts.wrappedNativeToken;
+    if (pair === 'USDT') return contracts.stableToken;
     return isAddress(quoteTokenInput) ? (quoteTokenInput as Address) : undefined;
-  }, [pair, quoteTokenInput]);
+  }, [contracts.stableToken, contracts.wrappedNativeToken, pair, quoteTokenInput]);
 
   const { data: launchFeeWei } = useReadContract({
-    address: eagleContracts.factory,
+    address: contracts.factory,
     abi: eagleFactoryAbi,
     functionName: 'launchFeeWei',
+    query: {
+      enabled: Boolean(contracts.factory),
+    },
   });
 
   const { data: customQuoteDecimals } = useReadContract({
@@ -337,7 +346,12 @@ export function LaunchSubmitActions({
   });
 
   const quoteDecimals = pair === 'ANY' ? Number(customQuoteDecimals ?? 18) : 18;
-  const resolvedQuoteSymbol = pair === 'BNB' ? 'WBNB' : pair === 'USDT' ? 'USDT' : (customQuoteSymbol ?? 'TOKEN');
+  const resolvedQuoteSymbol =
+    pair === 'BNB'
+      ? chain.wrappedNativeSymbol
+      : pair === 'USDT'
+        ? chain.stableSymbol
+        : (customQuoteSymbol ?? 'TOKEN');
   const tickSpacing = tickSpacingByFeeTier[feeTier];
 
   useEffect(() => {
@@ -353,7 +367,7 @@ export function LaunchSubmitActions({
     async function loadQuoteUsdPrice() {
       try {
         setQuotePriceLoading(true);
-        const usdPrice = await fetchQuoteUsdPrice(quoteToken);
+        const usdPrice = await fetchQuoteUsdPrice(quoteToken, chainKey);
         if (!cancelled) {
           setQuoteUsdPrice(usdPrice);
         }
@@ -373,7 +387,7 @@ export function LaunchSubmitActions({
     return () => {
       cancelled = true;
     };
-  }, [resolvedQuoteToken]);
+  }, [chainKey, resolvedQuoteToken]);
 
   const firstBuyAmount = useMemo(() => {
     try {
@@ -422,7 +436,7 @@ export function LaunchSubmitActions({
   const readyForPrediction = Boolean(address && name.trim() && ticker.trim());
 
   const { data: predictedTokenAddress } = useReadContract({
-    address: eagleContracts.factory,
+    address: contracts.factory,
     abi: eagleFactoryAbi,
     functionName: 'predictTokenAddress',
     args: readyForPrediction
@@ -436,17 +450,17 @@ export function LaunchSubmitActions({
         ]
       : undefined,
     query: {
-      enabled: readyForPrediction && Boolean(parsedTotalSupply),
+      enabled: readyForPrediction && Boolean(parsedTotalSupply) && Boolean(contracts.factory),
     },
   });
 
   const { data: predictedDistributorAddress } = useReadContract({
-    address: eagleContracts.distributorFactory,
+    address: contracts.distributorFactory,
     abi: eagleDistributorFactoryAbi,
     functionName: 'predict',
     args: predictedTokenAddress ? [predictedTokenAddress] : undefined,
     query: {
-      enabled: Boolean(predictedTokenAddress),
+      enabled: Boolean(predictedTokenAddress && contracts.distributorFactory),
     },
   });
 
@@ -456,9 +470,9 @@ export function LaunchSubmitActions({
     address: resolvedQuoteToken,
     abi: eagleErc20Abi,
     functionName: 'allowance',
-    args: address && resolvedQuoteToken ? [address, eagleContracts.factory] : undefined,
+    args: address && resolvedQuoteToken && contracts.factory ? [address, contracts.factory] : undefined,
     query: {
-      enabled: Boolean(address && resolvedQuoteToken && needsApproval),
+      enabled: Boolean(address && resolvedQuoteToken && needsApproval && contracts.factory),
     },
   });
 
@@ -477,6 +491,8 @@ export function LaunchSubmitActions({
   const formReady =
     isConnected &&
     Boolean(address) &&
+    Boolean(contracts.factory) &&
+    Boolean(contracts.distributorFactory) &&
     Boolean(name.trim()) &&
     Boolean(ticker.trim()) &&
     Boolean(resolvedQuoteToken) &&
@@ -493,7 +509,7 @@ export function LaunchSubmitActions({
   const canApprove = formReady && needsApproval && !approvalSatisfied;
 
   async function handleApprove() {
-    if (!resolvedQuoteToken || !firstBuyAmount || firstBuyAmount <= BigInt(0) || !publicClient) return;
+    if (!resolvedQuoteToken || !firstBuyAmount || firstBuyAmount <= BigInt(0) || !publicClient || !contracts.factory) return;
     try {
       setIsBusy(true);
       setStatus(locale.waitingApproval);
@@ -501,7 +517,7 @@ export function LaunchSubmitActions({
         address: resolvedQuoteToken,
         abi: eagleErc20Abi,
         functionName: 'approve',
-        args: [eagleContracts.factory, firstBuyAmount],
+        args: [contracts.factory, firstBuyAmount],
       });
       await publicClient.waitForTransactionReceipt({ hash });
       await refetchAllowance();
@@ -523,6 +539,7 @@ export function LaunchSubmitActions({
       parsedInitialBuyMinTokensOut === undefined ||
       !tickAligned ||
       !publicClient
+      || !contracts.factory
     ) {
       return;
     }
@@ -531,7 +548,7 @@ export function LaunchSubmitActions({
       setStatus(locale.waitingLaunch);
       const effectiveLaunchFee = launchFeeWei ?? defaultLaunchConfig.maxLaunchFeeWeiFallback;
       const hash = await writeContractAsync({
-        address: eagleContracts.factory,
+        address: contracts.factory,
         abi: eagleFactoryAbi,
         functionName: 'launch',
         args: [
@@ -573,7 +590,7 @@ export function LaunchSubmitActions({
           const poolAddress =
             matchedLaunchEvent?.args.pool ??
             (await publicClient.readContract({
-              address: eagleContracts.factory,
+              address: contracts.factory,
               abi: eagleFactoryAbi,
               functionName: 'launches',
               args: [launchedTokenAddress],
@@ -581,13 +598,14 @@ export function LaunchSubmitActions({
           const quoteToken =
             matchedLaunchEvent?.args.quoteToken ??
             (await publicClient.readContract({
-              address: eagleContracts.factory,
+              address: contracts.factory,
               abi: eagleFactoryAbi,
               functionName: 'launches',
               args: [launchedTokenAddress],
             }).then((launchRecord) => launchRecord[1]));
           if (poolAddress && quoteToken) {
             await registerLaunchedTokenWithRetry({
+              chainKey,
               address: launchedTokenAddress,
               name: typeof matchedLaunchEvent?.args.name === 'string' ? matchedLaunchEvent.args.name : name.trim(),
               symbol: typeof matchedLaunchEvent?.args.symbol === 'string' ? matchedLaunchEvent.args.symbol : ticker.trim(),
@@ -612,7 +630,7 @@ export function LaunchSubmitActions({
             name: name.trim(),
             symbol: ticker.trim(),
             totalSupply: parsedTotalSupply,
-            factoryAddress: eagleContracts.factory,
+            factoryAddress: contracts.factory,
             metadataURI: metadataUri,
             creator: address as Address,
           });
@@ -622,7 +640,7 @@ export function LaunchSubmitActions({
       }
       setStatus(locale.launchSuccess);
       if (launchedTokenAddress) {
-        router.push(`/token?address=${launchedTokenAddress}&lang=${lang}`);
+        router.push(`/token?address=${launchedTokenAddress}&lang=${lang}&chain=${chainKey}`);
       }
     } catch (error) {
       setStatus(normalizeError(error, locale.failedPrefix));
@@ -646,7 +664,7 @@ export function LaunchSubmitActions({
       <div className='grid gap-3 rounded-[14px] border border-white/8 bg-[#171916] p-3 text-sm'>
         <div className='flex items-center justify-between gap-4'>
           <span className='text-[#8f9482]'>{locale.platformFee}</span>
-          <span className='text-[#f3f1e8]'>{launchFeeText} BNB</span>
+          <span className='text-[#f3f1e8]'>{launchFeeText} {chain.nativeSymbol}</span>
         </div>
         <div className='flex items-center justify-between gap-4'>
           <span className='text-[#8f9482]'>Default start</span>
