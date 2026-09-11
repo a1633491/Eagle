@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { currency, numberCompact, percent, shorten } from '@/lib/format';
+import { getTokenImageUrl } from '@/lib/token-image';
 import { TokenSummary } from '@/lib/types';
 
 export function TokenTable({ tokens }: { tokens: TokenSummary[] }) {
@@ -23,9 +24,17 @@ export function TokenTable({ tokens }: { tokens: TokenSummary[] }) {
             <tr key={token.address} className="border-b border-white/6 transition hover:bg-white/[0.025]">
               <td className="px-4 py-3">
                 <Link href={`/token?address=${token.address}`} className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#d8c48333] bg-[#ffffff06] font-semibold text-[#d1b773]">
-                    {token.symbol.slice(0, 2)}
-                  </div>
+                  {getTokenImageUrl(token.metadataURI) ? (
+                    <img
+                      src={getTokenImageUrl(token.metadataURI)}
+                      alt={token.name}
+                      className="h-10 w-10 rounded-full border border-[#d8c48333] object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#d8c48333] bg-[#ffffff06] font-semibold text-[#d1b773]">
+                      {token.symbol.slice(0, 2)}
+                    </div>
+                  )}
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-[#f3f1e8]">{token.name}</p>

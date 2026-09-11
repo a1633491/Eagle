@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { EagleMark } from '@/components/eagle-mark';
 import { shorten } from '@/lib/format';
 import { t, withLang, type Lang } from '@/lib/i18n';
+import { getTokenImageUrl } from '@/lib/token-image';
 import { TokenDetail } from '@/lib/types';
 
 type ExploreTab = 'trending' | 'market-cap' | 'new';
@@ -122,7 +123,17 @@ export function HomeExploreTabs({
                 <span>◆</span>
                 {token.quoteSymbol}
               </span>
-              {tokenArtType(token) === 0 ? (
+              {getTokenImageUrl(token.metadataURI) ? (
+            <div
+                  className='relative h-24 w-24 overflow-hidden rounded-full border border-white/15 shadow-[0_14px_40px_rgba(0,0,0,0.28)]'
+            >
+                <img
+                    src={getTokenImageUrl(token.metadataURI)}
+                  alt={token.name}
+                    className='h-full w-full object-cover'
+                />
+                </div>
+              ) : tokenArtType(token) === 0 ? (
                 <EagleMark className='relative h-20 w-20 opacity-95' />
               ) : tokenArtType(token) === 1 ? (
                 <div className='relative flex h-20 w-20 items-center justify-center rounded-full bg-[#fff7ea]/85 text-[2rem] font-semibold text-[#8a5d2b] shadow-[0_10px_30px_rgba(0,0,0,0.14)]'>

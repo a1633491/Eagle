@@ -59,6 +59,7 @@ export type TokenRecord = {
   chart: ChartPoint[];
   trades: TokenTrade[];
   metadataURI?: string;
+  imageUrl?: string;
   feeTier?: number;
   launchedAt: string;
 };
@@ -93,6 +94,8 @@ type FallbackToken = {
   pairLabel: string;
   chart: ChartPoint[];
   trades: TokenTrade[];
+  metadataURI?: string;
+  imageUrl?: string;
 };
 
 type FallbackOverview = {
@@ -445,6 +448,21 @@ function buildTotalSupplyLabel(totalSupply: string, symbol: string) {
   return `${compactAmount(amount)} ${symbol}`;
 }
 
+function extractImageUrl(metadataURI?: string) {
+  const trimmed = metadataURI?.trim();
+  if (!trimmed) return '';
+  if (!trimmed.startsWith('data:application/json,')) return '';
+
+  try {
+    const payload = JSON.parse(decodeURIComponent(trimmed.slice('data:application/json,'.length))) as {
+      image?: unknown;
+    };
+    return typeof payload.image === 'string' ? payload.image : '';
+  } catch {
+    return '';
+  }
+}
+
 function toTokenRecord(document: StoredTokenDocument): TokenRecord {
   return {
     address: document.address,
@@ -470,6 +488,7 @@ function toTokenRecord(document: StoredTokenDocument): TokenRecord {
     chart: document.chart.length ? document.chart : buildChart(document.priceUsd, document.launchedAt),
     trades: document.trades,
     metadataURI: document.metadataURI,
+    imageUrl: extractImageUrl(document.metadataURI),
     feeTier: document.feeTier,
     launchedAt: document.launchedAt.toISOString(),
   };

@@ -10,6 +10,7 @@ import { TokenMarketSections } from '@/components/token-market-sections';
 import { currency, percent, shorten } from '@/lib/format';
 import { eagleContracts, eagleErc20Abi, eagleFactoryAbi, eagleLiquidityLockerAbi } from '@/lib/contracts';
 import { t, type Lang } from '@/lib/i18n';
+import { getTokenImageUrl } from '@/lib/token-image';
 import { type TokenDetail } from '@/lib/types';
 import { useLiveTokenMarket } from '@/lib/use-live-token-market';
 
@@ -201,6 +202,7 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
   const launchedDate = formatLaunchDate(launchTimestamp, lang, token.launchedDate);
   const pairLabel = `${symbol} / ${quoteSymbol}`;
   const totalSupply = formatSupply(tokenTotalSupplyData, tokenDecimalsData, symbol);
+  const imageUrl = getTokenImageUrl(token.metadataURI);
   const creatorClaimableText = useMemo(() => {
     return `${formatUnits(creatorClaimableFees ?? BigInt(0), Number(quoteDecimalsData ?? 18))} ${quoteSymbol}`.trim();
   }, [creatorClaimableFees, quoteDecimalsData, quoteSymbol]);
@@ -240,9 +242,17 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
           <div className='flex flex-wrap items-start justify-between gap-4'>
             <div>
               <div className='mt-1.5 flex items-center gap-3'>
-                <div className='flex h-11 w-11 items-center justify-center rounded-full border border-[#d8c48333] bg-[#ffffff06] text-base font-semibold text-[#d1b773]'>
-                  {symbol.slice(0, 2)}
-                </div>
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt={displayName}
+                    className='h-11 w-11 rounded-full border border-[#d8c48333] object-cover'
+                  />
+                ) : (
+                  <div className='flex h-11 w-11 items-center justify-center rounded-full border border-[#d8c48333] bg-[#ffffff06] text-base font-semibold text-[#d1b773]'>
+                    {symbol.slice(0, 2)}
+                  </div>
+                )}
                 <div>
                   <h1 className='text-[2rem] font-semibold tracking-[-0.06em] text-[#f3f1e8]'>{symbol}</h1>
                   <div className='mt-0.5 flex flex-wrap items-center gap-2 text-[13px] text-[#c6c8bd]'>

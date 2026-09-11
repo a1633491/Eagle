@@ -15,6 +15,7 @@ export type TokenSummary = {
   poolAddress: string;
   official?: boolean;
   tags: string[];
+  metadataURI?: string;
 };
 
 export type Trade = {
