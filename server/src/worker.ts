@@ -1,0 +1,154 @@
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { marketOverview, tokenDetails } from './data/mockData.js';
+import {
+  forceFactorySync,
+  getFactorySyncStatus,
+  getMarketOverview,
+  getRuntimeDiagnostics,
+  getTokenDetail,
+  getTokenTrades,
+  registerTokenLaunch,
+  setWorkerStorageBindings,
+  type RegisterTokenPayload,
+} from './tokenRegistry.js';
+
+type WorkerBindings = {
+  TOKEN_STORAGE_KV?: {
+    get(key: string, options?: { type?: 'text' | 'json' }): Promise<unknown>;
+    put(key: string, value: string): Promise<void>;
+  };
+  WORKER_RUNTIME?: string;
+  MONGODB_URI?: string;
+  REDIS_URL?: string;
+  BSC_RPC_URL?: string;
+  EAGLE_FACTORY_ADDRESS?: string;
+  EAGLE_FACTORY_START_BLOCK?: string;
+  EAGLE_SYNC_BLOCK_WINDOW?: string;
+  EAGLE_SYNC_CHUNK_SIZE?: string;
+  EAGLE_SYNC_MAX_CHUNKS_PER_RUN?: string;
+  TOKEN_SYNC_COOLDOWN_MS?: string;
+};
+
+type WorkerExecutionContext = {
+  waitUntil(promise: Promise<unknown>): void;
+};
+
+type ScheduledControllerLike = {
+  cron: string;
+  scheduledTime: number;
+};
+
+const app = new Hono<{ Bindings: WorkerBindings }>();
+
+const ok = <T>(data: T) => ({ code: 200, msg: 'success', data });
+const fail = (msg: string, code = 400) => ({ code, msg, data: null });
+
+function applyBindings(bindings: WorkerBindings) {
+  process.env.WORKER_RUNTIME = 'cloudflare';
+  setWorkerStorageBindings({ TOKEN_STORAGE_KV: bindings.TOKEN_STORAGE_KV ?? null });
+  for (const [key, value] of Object.entries(bindings)) {
+    if (key === 'WORKER_RUNTIME' || key === 'TOKEN_STORAGE_KV') continue;
+    if (value === undefined) {
+      delete process.env[key];
+      continue;
+    }
+    if (typeof value === 'string') {
+      process.env[key] = value;
+    }
+  }
+}
+
+app.use('*', cors());
+app.use('*', async (c, next) => {
+  applyBindings(c.env);
+  await next();
+});
+
+app.get('/', (c) => {
+  return c.json(ok({ service: 'eagle-server-worker', status: 'ok' }));
+});
+
+app.get('/api/health', (c) => {
+  return c.json(ok({ status: 'ok', runtime: 'cloudflare-worker', diagnostics: getRuntimeDiagnostics() }));
+});
+
+app.get('/api/tokens', async (c) => {
+  try {
+    const overview = await getMarketOverview(marketOverview);
+    return c.json(ok(overview));
+  } catch (error) {
+    return c.json(
+      ok({ ...marketOverview, launchedCount: 0, totalVolume24h: 0, trending: [], tokens: [] }),
+      200,
+    );
+  }
+});
+
+app.get('/api/tokens/sync-status', async (c) => {
+  try {
+    const status = await getFactorySyncStatus();
+    return c.json(ok(status));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to get sync status';
+    return c.json(fail(message, 500), 500);
+  }
+});
+
+app.post('/api/tokens/sync', async (c) => {
+  try {
+    const body = (await c.req.json<{ reset?: boolean }>().catch(() => ({} as { reset?: boolean }))) as {
+      reset?: boolean;
+    };
+    const status = await forceFactorySync({ reset: Boolean(body.reset) });
+    return c.json(ok(status));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to sync factory launches';
+    return c.json(fail(message, 500), 500);
+  }
+});
+
+app.post('/api/tokens/register', async (c) => {
+  const payload = await c.req.json<RegisterTokenPayload>();
+  try {
+    const token = await registerTokenLaunch(payload);
+    return c.json(ok(token));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to register token';
+    return c.json(fail(message), 400);
+  }
+});
+
+app.get('/api/tokens/:address', async (c) => {
+  try {
+    const token = await getTokenDetail(c.req.param('address'), tokenDetails);
+    return c.json(ok(token));
+  } catch {
+    return c.json(fail('Token not found', 404), 404);
+  }
+});
+
+app.get('/api/tokens/:address/trades', async (c) => {
+  try {
+    const trades = await getTokenTrades(c.req.param('address'), tokenDetails);
+    return c.json(ok(trades));
+  } catch {
+    return c.json(fail('Token not found', 404), 404);
+  }
+});
+
+app.post('/api/verify-token', (c) => {
+  return c.json(fail('verify-token is not supported on Cloudflare Workers', 501), 501);
+});
+
+async function runScheduledSync(bindings: WorkerBindings) {
+  applyBindings(bindings);
+  await forceFactorySync();
+}
+
+export default {
+  fetch: app.fetch,
+  scheduled(_controller: ScheduledControllerLike, env: WorkerBindings, ctx: WorkerExecutionContext) {
+    ctx.waitUntil(runScheduledSync(env));
+  },
+};

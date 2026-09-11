@@ -1,0 +1,21 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "eagle-server-worker",
+	"main": "src/worker.ts",
+	"compatibility_date": "2026-09-11",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"observability": {
+		"enabled": true
+	},
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+	"kv_namespaces": [
+		{
+			"binding": "TOKEN_STORAGE_KV",
+			"id": "2d9c29ad12b047ffb7046f81c712b869"
+		}
+	]
+}

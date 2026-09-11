@@ -3,7 +3,17 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from 'wagmi';
-import { type Address, formatEther, formatUnits, isAddress, keccak256, parseUnits, stringToHex, zeroAddress } from 'viem';
+import {
+  type Address,
+  formatEther,
+  formatUnits,
+  isAddress,
+  keccak256,
+  parseEventLogs,
+  parseUnits,
+  stringToHex,
+  zeroAddress,
+} from 'viem';
 import {
   defaultLaunchConfig,
   eagleContracts,
@@ -220,16 +230,42 @@ async function registerLaunchedToken(payload: {
     headers: {
       'Content-Type': 'application/json',
     },
+    keepalive: true,
     body: JSON.stringify({
       ...payload,
       totalSupply: payload.totalSupply.toString(),
     }),
-    signal: AbortSignal.timeout(2500),
+    signal: AbortSignal.timeout(10000),
   });
 
   if (!response.ok) {
     throw new Error(`Failed to register launched token (${response.status})`);
   }
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function registerLaunchedTokenWithRetry(
+  payload: Parameters<typeof registerLaunchedToken>[0],
+  attempts = 4,
+) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      await registerLaunchedToken(payload);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts - 1) {
+        await sleep(800 * (attempt + 1));
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Failed to register launched token');
 }
 
 export function LaunchSubmitActions({
@@ -497,35 +533,54 @@ export function LaunchSubmitActions({
         ],
         value: effectiveLaunchFee + (pair === 'BNB' ? firstBuyAmount : BigInt(0)),
       });
-      await publicClient.waitForTransactionReceipt({ hash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
       if (predictedTokenAddress) {
         try {
-          const launchRecord = await publicClient.readContract({
-            address: eagleContracts.factory,
+          const launchEvents = parseEventLogs({
             abi: eagleFactoryAbi,
-            functionName: 'launches',
-            args: [predictedTokenAddress],
+            eventName: 'TokenLaunched',
+            logs: receipt.logs,
+            strict: false,
           });
-          const poolAddress = launchRecord[2];
-          const quoteToken = launchRecord[1];
+          const launchEvent = launchEvents.find(
+            (event) => event.args.token?.toLowerCase() === predictedTokenAddress.toLowerCase(),
+          );
+          const block = await publicClient.getBlock({ blockNumber: receipt.blockNumber });
+          const poolAddress =
+            launchEvent?.args.pool ??
+            (await publicClient.readContract({
+              address: eagleContracts.factory,
+              abi: eagleFactoryAbi,
+              functionName: 'launches',
+              args: [predictedTokenAddress],
+            }).then((launchRecord) => launchRecord[2]));
+          const quoteToken =
+            launchEvent?.args.quoteToken ??
+            (await publicClient.readContract({
+              address: eagleContracts.factory,
+              abi: eagleFactoryAbi,
+              functionName: 'launches',
+              args: [predictedTokenAddress],
+            }).then((launchRecord) => launchRecord[1]));
           if (poolAddress && quoteToken) {
-            await registerLaunchedToken({
+            await registerLaunchedTokenWithRetry({
               address: predictedTokenAddress,
-              name: name.trim(),
-              symbol: ticker.trim(),
+              name: typeof launchEvent?.args.name === 'string' ? launchEvent.args.name : name.trim(),
+              symbol: typeof launchEvent?.args.symbol === 'string' ? launchEvent.args.symbol : ticker.trim(),
               description: story.trim(),
               creator: address as Address,
               poolAddress,
               quoteToken,
               quoteSymbol: resolvedQuoteSymbol,
               totalSupply: parsedTotalSupply,
-              metadataURI: metadataUri,
-              feeTier,
-              launchedAt: new Date().toISOString(),
+              metadataURI:
+                typeof launchEvent?.args.metadataURI === 'string' ? launchEvent.args.metadataURI : metadataUri,
+              feeTier: typeof launchEvent?.args.fee === 'number' ? launchEvent.args.fee : feeTier,
+              launchedAt: new Date(Number(block.timestamp) * 1000).toISOString(),
             });
           }
         } catch {
-          // Token registration is best-effort and should not block launch completion.
+          // Registration is retried client-side; if it still fails, background sync remains as a fallback.
         }
         try {
           await queueAutomaticVerification({

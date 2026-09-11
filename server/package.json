@@ -6,21 +6,27 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "node scripts/build.mjs",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "dev:worker": "wrangler dev",
+    "deploy:worker": "wrangler deploy",
+    "typecheck:worker": "tsc -p tsconfig.worker.json --noEmit"
   },
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "hono": "^4.13.7",
     "mongoose": "^9.9.5",
     "redis": "^6.2.1",
     "viem": "^2.56.3"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260911.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.4.1",
     "tsx": "^4.23.13",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "wrangler": "^4.131.0"
   }
 }

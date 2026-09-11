@@ -10,6 +10,11 @@ const DEFAULT_SYNC_MAX_CHUNKS_PER_RUN = 8;
 const DEFAULT_SYNC_COOLDOWN_MS = 30_000;
 const DEFAULT_CACHE_TTL_SECONDS = 30;
 const FACTORY_SYNC_STATE_KEY = 'factory-launch-sync';
+const WORKER_TOKENS_KV_KEY = 'tokens:all';
+const WORKER_SYNC_STATE_KV_KEY = `sync:${FACTORY_SYNC_STATE_KEY}`;
+const DEBUG_SERVER_URL = 'http://127.0.0.1:7777/event';
+const DEBUG_SESSION_ID = 'token-list-missing';
+const DEBUG_ENABLED = process.env.ENABLE_DEBUG_LOGS === '1';
 
 const tokenLaunchedEvent = parseAbiItem(
   'event TokenLaunched(address indexed token, address indexed creator, address indexed quoteToken, address pool, uint24 fee, int24 initialTick, uint256 totalSupply, uint256[] lockedPositionIds, string name, string symbol, string metadataURI)',
@@ -149,6 +154,19 @@ export type SyncStatus = {
   updatedAt: string;
 };
 
+export type RuntimeDiagnostics = {
+  runtime: 'node' | 'cloudflare-worker';
+  hasMongoUri: boolean;
+  hasRedisUrl: boolean;
+  hasRpcUrl: boolean;
+  hasWorkerKv: boolean;
+  mongoReadyState: number;
+  inMemoryTokenCount: number;
+  hasInMemorySyncState: boolean;
+  lastFactorySyncAt: number;
+  storageBackend: 'memory' | 'mongo' | 'worker-kv';
+};
+
 type StoredSyncStateDocument = {
   key: string;
   syncStartedFrom: string;
@@ -157,6 +175,20 @@ type StoredSyncStateDocument = {
   lastSyncStatus: 'idle' | 'syncing' | 'done' | 'error';
   lastSyncError: string;
   updatedAt: Date;
+};
+
+type WorkerKvStore = {
+  get(key: string, options?: { type?: 'text' | 'json' }): Promise<unknown>;
+  put(key: string, value: string): Promise<void>;
+};
+
+type SerializedStoredToken = Omit<StoredTokenDocument, 'launchedAt' | 'updatedAt'> & {
+  launchedAt: string;
+  updatedAt: string;
+};
+
+type SerializedStoredSyncState = Omit<StoredSyncStateDocument, 'updatedAt'> & {
+  updatedAt: string;
 };
 
 const chartPointSchema = new Schema<ChartPoint>(
@@ -241,6 +273,96 @@ let mongoConnectPromise: Promise<typeof mongoose> | null = null;
 let redisClientPromise: Promise<RedisClientType | null> | null = null;
 let lastFactorySyncAt = 0;
 let syncInFlight: Promise<void> | null = null;
+let workerKvStore: WorkerKvStore | null = null;
+
+function isWorkerRuntime() {
+  return process.env.WORKER_RUNTIME === 'cloudflare';
+}
+
+function getWorkerKvStore() {
+  return isWorkerRuntime() ? workerKvStore : null;
+}
+
+function serializeStoredToken(document: StoredTokenDocument): SerializedStoredToken {
+  return {
+    ...document,
+    launchedAt: document.launchedAt.toISOString(),
+    updatedAt: document.updatedAt.toISOString(),
+  };
+}
+
+function deserializeStoredToken(document: SerializedStoredToken): StoredTokenDocument {
+  return {
+    ...document,
+    launchedAt: new Date(document.launchedAt),
+    updatedAt: new Date(document.updatedAt),
+  };
+}
+
+function serializeStoredSyncState(document: StoredSyncStateDocument): SerializedStoredSyncState {
+  return {
+    ...document,
+    updatedAt: document.updatedAt.toISOString(),
+  };
+}
+
+function deserializeStoredSyncState(document: SerializedStoredSyncState): StoredSyncStateDocument {
+  return {
+    ...document,
+    updatedAt: new Date(document.updatedAt),
+  };
+}
+
+async function readWorkerStoredTokens() {
+  const kv = getWorkerKvStore();
+  if (!kv) return null;
+  const payload = (await kv.get(WORKER_TOKENS_KV_KEY, {
+    type: 'json',
+  })) as SerializedStoredToken[] | null;
+  return (payload ?? []).map(deserializeStoredToken);
+}
+
+async function writeWorkerStoredTokens(tokens: StoredTokenDocument[]) {
+  const kv = getWorkerKvStore();
+  if (!kv) return false;
+  await kv.put(
+    WORKER_TOKENS_KV_KEY,
+    JSON.stringify(tokens.map(serializeStoredToken)),
+  );
+  return true;
+}
+
+async function readWorkerSyncState() {
+  const kv = getWorkerKvStore();
+  if (!kv) return null;
+  const payload = (await kv.get(WORKER_SYNC_STATE_KV_KEY, {
+    type: 'json',
+  })) as SerializedStoredSyncState | null;
+  return payload ? deserializeStoredSyncState(payload) : null;
+}
+
+async function writeWorkerSyncState(document: StoredSyncStateDocument) {
+  const kv = getWorkerKvStore();
+  if (!kv) return false;
+  await kv.put(WORKER_SYNC_STATE_KV_KEY, JSON.stringify(serializeStoredSyncState(document)));
+  return true;
+}
+
+function emitDebug(hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) {
+  if (!DEBUG_ENABLED) return;
+  fetch(DEBUG_SERVER_URL, {
+    method: 'POST',
+    body: JSON.stringify({
+      sessionId: DEBUG_SESSION_ID,
+      runId: 'pre-fix',
+      hypothesisId,
+      location,
+      msg,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+}
 
 function envNumber(name: string, fallback: number) {
   const value = process.env[name]?.trim();
@@ -383,6 +505,7 @@ function toSyncStatus(document: StoredSyncStateDocument): SyncStatus {
 
 async function getRedisClient() {
   const redisUrl = process.env.REDIS_URL?.trim();
+  if (isWorkerRuntime()) return null;
   if (!redisUrl) return null;
   if (!redisClientPromise) {
     redisClientPromise = (async () => {
@@ -397,37 +520,96 @@ async function getRedisClient() {
 
 async function getMongoConnection() {
   const mongoUri = process.env.MONGODB_URI?.trim();
+  // #region debug-point C:mongo-connect-attempt
+  emitDebug('C', 'server/src/tokenRegistry.ts:getMongoConnection:attempt', '[DEBUG] Mongo connection requested', {
+    hasMongoUri: Boolean(mongoUri),
+    readyState: mongoose.connection.readyState,
+    workerRuntime: isWorkerRuntime(),
+  });
+  // #endregion
   if (!mongoUri) return null;
   if (mongoose.connection.readyState === 1) return mongoose;
   if (!mongoConnectPromise) {
-    mongoConnectPromise = mongoose.connect(mongoUri);
+    mongoConnectPromise = mongoose.connect(
+      mongoUri,
+      isWorkerRuntime()
+        ? {
+            maxPoolSize: 1,
+            minPoolSize: 0,
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 10000,
+            retryWrites: false,
+          }
+        : undefined,
+    );
   }
-  return mongoConnectPromise.catch(() => null);
+  return mongoConnectPromise.catch((error) => {
+    // #region debug-point C:mongo-connect-error
+    emitDebug('C', 'server/src/tokenRegistry.ts:getMongoConnection:error', '[DEBUG] Mongo connection failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // #endregion
+    return null;
+  });
 }
 
 async function readStoredTokens() {
+  const workerTokens = await readWorkerStoredTokens();
+  if (workerTokens) {
+    return workerTokens.sort((left, right) => right.launchedAt.getTime() - left.launchedAt.getTime());
+  }
+
   const connection = await getMongoConnection();
   if (connection) {
     const rows = await StoredTokenModel.find().sort({ launchedAt: -1 }).lean();
+    // #region debug-point C:read-stored-tokens-mongo
+    emitDebug('C', 'server/src/tokenRegistry.ts:readStoredTokens:mongo', '[DEBUG] Read stored tokens from MongoDB', {
+      count: rows.length,
+    });
+    // #endregion
     return rows.map((row) => ({
       ...row,
       launchedAt: new Date(row.launchedAt),
       updatedAt: new Date(row.updatedAt),
     })) as StoredTokenDocument[];
   }
+  // #region debug-point E:read-stored-tokens-memory
+  emitDebug('E', 'server/src/tokenRegistry.ts:readStoredTokens:memory', '[DEBUG] Read stored tokens from in-memory fallback', {
+    count: inMemoryTokens.size,
+  });
+  // #endregion
   return [...inMemoryTokens.values()].sort((left, right) => right.launchedAt.getTime() - left.launchedAt.getTime());
 }
 
 async function writeStoredToken(document: StoredTokenDocument) {
+  const workerTokens = await readWorkerStoredTokens();
+  if (workerTokens) {
+    const nextTokens = workerTokens.filter((entry) => entry.address !== document.address);
+    nextTokens.push(document);
+    await writeWorkerStoredTokens(nextTokens);
+  } else {
   const connection = await getMongoConnection();
   if (connection) {
+    // #region debug-point C:write-stored-token-mongo
+    emitDebug('C', 'server/src/tokenRegistry.ts:writeStoredToken:mongo', '[DEBUG] Writing token to MongoDB', {
+      address: document.address,
+      symbol: document.symbol,
+    });
+    // #endregion
     await StoredTokenModel.findOneAndUpdate(
       { address: document.address },
       { ...document, updatedAt: new Date() },
       { upsert: true, setDefaultsOnInsert: true },
     );
   } else {
+    // #region debug-point E:write-stored-token-memory
+    emitDebug('E', 'server/src/tokenRegistry.ts:writeStoredToken:memory', '[DEBUG] Writing token to in-memory fallback', {
+      address: document.address,
+      symbol: document.symbol,
+    });
+    // #endregion
     inMemoryTokens.set(document.address.toLowerCase(), document);
+  }
   }
 
   const redis = await getRedisClient();
@@ -441,6 +623,11 @@ async function writeStoredToken(document: StoredTokenDocument) {
 
 async function readStoredToken(address: string) {
   const normalized = address.toLowerCase();
+  const workerTokens = await readWorkerStoredTokens();
+  if (workerTokens) {
+    return workerTokens.find((entry) => entry.address === normalized) ?? null;
+  }
+
   const connection = await getMongoConnection();
   if (connection) {
     const row = await StoredTokenModel.findOne({ address: normalized }).lean();
@@ -455,6 +642,11 @@ async function readStoredToken(address: string) {
 }
 
 async function readSyncState() {
+  const workerState = await readWorkerSyncState();
+  if (workerState) {
+    return workerState;
+  }
+
   const connection = await getMongoConnection();
   if (connection) {
     const row = await StoredSyncStateModel.findOne({ key: FACTORY_SYNC_STATE_KEY }).lean();
@@ -477,6 +669,10 @@ async function writeSyncState(update: Partial<StoredSyncStateDocument> & { key?:
     lastSyncError: update.lastSyncError ?? '',
     updatedAt: update.updatedAt ?? new Date(),
   };
+
+  if (await writeWorkerSyncState(nextState)) {
+    return;
+  }
 
   const connection = await getMongoConnection();
   if (connection) {
@@ -608,6 +804,13 @@ function resolvedFactoryStartBlock(latestBlock: bigint) {
 
 async function syncFactoryLaunchesInternal(options?: { force?: boolean; reset?: boolean }) {
   const rpcUrl = process.env.BSC_RPC_URL?.trim();
+  // #region debug-point D:sync-start
+  emitDebug('D', 'server/src/tokenRegistry.ts:syncFactoryLaunchesInternal:start', '[DEBUG] Factory sync invoked', {
+    hasRpcUrl: Boolean(rpcUrl),
+    force: Boolean(options?.force),
+    reset: Boolean(options?.reset),
+  });
+  // #endregion
   if (!rpcUrl) return;
 
   const now = Date.now();
@@ -622,6 +825,16 @@ async function syncFactoryLaunchesInternal(options?: { force?: boolean; reset?: 
   const chunkSize = envBigInt('EAGLE_SYNC_CHUNK_SIZE', DEFAULT_SYNC_CHUNK_SIZE);
   const maxChunksPerRun = envNumber('EAGLE_SYNC_MAX_CHUNKS_PER_RUN', DEFAULT_SYNC_MAX_CHUNKS_PER_RUN);
   const factoryAddress = normalizeAddress(process.env.EAGLE_FACTORY_ADDRESS?.trim() || DEFAULT_FACTORY_ADDRESS);
+  // #region debug-point D:sync-config
+  emitDebug('D', 'server/src/tokenRegistry.ts:syncFactoryLaunchesInternal:config', '[DEBUG] Factory sync config resolved', {
+    latestBlock: latestBlock.toString(),
+    startBlock: startBlock.toString(),
+    chunkSize: chunkSize.toString(),
+    maxChunksPerRun,
+    factoryAddress,
+    workerRuntime: isWorkerRuntime(),
+  });
+  // #endregion
 
   const existingState = options?.reset ? null : await readSyncState();
   if (options?.reset || (existingState && BigInt(existingState.syncStartedFrom) > startBlock)) {
@@ -660,6 +873,14 @@ async function syncFactoryLaunchesInternal(options?: { force?: boolean; reset?: 
         fromBlock: cursor,
         toBlock,
       });
+      // #region debug-point D:sync-chunk
+      emitDebug('D', 'server/src/tokenRegistry.ts:syncFactoryLaunchesInternal:chunk', '[DEBUG] Factory sync chunk scanned', {
+        fromBlock: cursor.toString(),
+        toBlock: toBlock.toString(),
+        logCount: logs.length,
+        processedChunks,
+      });
+      // #endregion
 
       for (const log of logs) {
         const args = log.args;
@@ -680,6 +901,13 @@ async function syncFactoryLaunchesInternal(options?: { force?: boolean; reset?: 
           feeTier: Number(args.fee),
           launchedAt: new Date(Number(block.timestamp) * 1000).toISOString(),
         });
+        // #region debug-point D:sync-register-token
+        emitDebug('D', 'server/src/tokenRegistry.ts:syncFactoryLaunchesInternal:register', '[DEBUG] Factory sync registered token from log', {
+          token: args.token,
+          symbol: args.symbol,
+          blockNumber: log.blockNumber?.toString?.() ?? null,
+        });
+        // #endregion
       }
 
       await writeSyncState({
@@ -697,6 +925,11 @@ async function syncFactoryLaunchesInternal(options?: { force?: boolean; reset?: 
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    // #region debug-point D:sync-error
+    emitDebug('D', 'server/src/tokenRegistry.ts:syncFactoryLaunchesInternal:error', '[DEBUG] Factory sync failed', {
+      error: message,
+    });
+    // #endregion
     await writeSyncState({
       key: FACTORY_SYNC_STATE_KEY,
       syncStartedFrom: startBlock.toString(),
@@ -740,6 +973,30 @@ export async function forceFactorySync(options?: { reset?: boolean }) {
   return getFactorySyncStatus();
 }
 
+export function getRuntimeDiagnostics(): RuntimeDiagnostics {
+  const storageBackend: RuntimeDiagnostics['storageBackend'] = getWorkerKvStore()
+    ? 'worker-kv'
+    : process.env.MONGODB_URI?.trim()
+      ? 'mongo'
+      : 'memory';
+  return {
+    runtime: isWorkerRuntime() ? 'cloudflare-worker' : 'node',
+    hasMongoUri: Boolean(process.env.MONGODB_URI?.trim()),
+    hasRedisUrl: Boolean(process.env.REDIS_URL?.trim()),
+    hasRpcUrl: Boolean(process.env.BSC_RPC_URL?.trim()),
+    hasWorkerKv: Boolean(getWorkerKvStore()),
+    mongoReadyState: mongoose.connection.readyState,
+    inMemoryTokenCount: inMemoryTokens.size,
+    hasInMemorySyncState: Boolean(inMemorySyncState),
+    lastFactorySyncAt,
+    storageBackend,
+  };
+}
+
+export function setWorkerStorageBindings(bindings: { TOKEN_STORAGE_KV?: WorkerKvStore | null }) {
+  workerKvStore = bindings.TOKEN_STORAGE_KV ?? null;
+}
+
 export async function registerTokenLaunch(payload: RegisterTokenPayload) {
   const validationError = validateRegisterPayload(payload);
   if (validationError) {
@@ -751,7 +1008,9 @@ export async function registerTokenLaunch(payload: RegisterTokenPayload) {
 }
 
 export async function getMarketOverview(fallback: FallbackOverview) {
-  await Promise.allSettled([syncFactoryLaunches()]);
+  if (!isWorkerRuntime()) {
+    await Promise.allSettled([syncFactoryLaunches()]);
+  }
 
   const redis = await getRedisClient();
   if (redis) {
@@ -763,6 +1022,13 @@ export async function getMarketOverview(fallback: FallbackOverview) {
 
   const stored = await readStoredTokens();
   const overview = buildOverview(stored.map(toTokenRecord), fallback);
+  // #region debug-point B:get-market-overview-result
+  emitDebug('B', 'server/src/tokenRegistry.ts:getMarketOverview:result', '[DEBUG] Market overview built', {
+    storedCount: stored.length,
+    launchedCount: overview.launchedCount,
+    trendingCount: overview.trending.length,
+  });
+  // #endregion
 
   if (redis) {
     await redis.set('eagle:market-overview', JSON.stringify(overview), {
@@ -777,7 +1043,9 @@ export async function getTokenDetail(address: string, _fallbackTokens: FallbackT
     throw new Error('Invalid token address');
   }
 
-  await Promise.allSettled([syncFactoryLaunches()]);
+  if (!isWorkerRuntime()) {
+    await Promise.allSettled([syncFactoryLaunches()]);
+  }
 
   const redis = await getRedisClient();
   const cacheKey = `eagle:token:${address.toLowerCase()}`;
