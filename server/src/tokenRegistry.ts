@@ -328,11 +328,15 @@ async function readWorkerStoredTokens() {
 async function writeWorkerStoredTokens(tokens: StoredTokenDocument[]) {
   const kv = getWorkerKvStore();
   if (!kv) return false;
-  await kv.put(
-    WORKER_TOKENS_KV_KEY,
-    JSON.stringify(tokens.map(serializeStoredToken)),
-  );
-  return true;
+  try {
+    await kv.put(
+      WORKER_TOKENS_KV_KEY,
+      JSON.stringify(tokens.map(serializeStoredToken)),
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function readWorkerSyncState() {
@@ -347,8 +351,12 @@ async function readWorkerSyncState() {
 async function writeWorkerSyncState(document: StoredSyncStateDocument) {
   const kv = getWorkerKvStore();
   if (!kv) return false;
-  await kv.put(WORKER_SYNC_STATE_KV_KEY, JSON.stringify(serializeStoredSyncState(document)));
-  return true;
+  try {
+    await kv.put(WORKER_SYNC_STATE_KV_KEY, JSON.stringify(serializeStoredSyncState(document)));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function emitDebug(hypothesisId: string, location: string, msg: string, data: Record<string, unknown>) {
@@ -575,7 +583,14 @@ async function getMongoConnection() {
 async function readStoredTokens() {
   const workerTokens = await readWorkerStoredTokens();
   if (workerTokens) {
-    return workerTokens.sort((left, right) => right.launchedAt.getTime() - left.launchedAt.getTime());
+    const mergedTokens = new Map<string, StoredTokenDocument>();
+    for (const token of workerTokens) {
+      mergedTokens.set(token.address, token);
+    }
+    for (const [address, token] of inMemoryTokens.entries()) {
+      mergedTokens.set(address, token);
+    }
+    return [...mergedTokens.values()].sort((left, right) => right.launchedAt.getTime() - left.launchedAt.getTime());
   }
 
   const connection = await getMongoConnection();
@@ -605,30 +620,33 @@ async function writeStoredToken(document: StoredTokenDocument) {
   if (workerTokens) {
     const nextTokens = workerTokens.filter((entry) => entry.address !== document.address);
     nextTokens.push(document);
-    await writeWorkerStoredTokens(nextTokens);
+    if (await writeWorkerStoredTokens(nextTokens)) {
+      inMemoryTokens.set(document.address.toLowerCase(), document);
+      return;
+    }
   } else {
-  const connection = await getMongoConnection();
-  if (connection) {
-    // #region debug-point C:write-stored-token-mongo
-    emitDebug('C', 'server/src/tokenRegistry.ts:writeStoredToken:mongo', '[DEBUG] Writing token to MongoDB', {
-      address: document.address,
-      symbol: document.symbol,
-    });
-    // #endregion
-    await StoredTokenModel.findOneAndUpdate(
-      { address: document.address },
-      { ...document, updatedAt: new Date() },
-      { upsert: true, setDefaultsOnInsert: true },
-    );
-  } else {
-    // #region debug-point E:write-stored-token-memory
-    emitDebug('E', 'server/src/tokenRegistry.ts:writeStoredToken:memory', '[DEBUG] Writing token to in-memory fallback', {
-      address: document.address,
-      symbol: document.symbol,
-    });
-    // #endregion
-    inMemoryTokens.set(document.address.toLowerCase(), document);
-  }
+    const connection = await getMongoConnection();
+    if (connection) {
+      // #region debug-point C:write-stored-token-mongo
+      emitDebug('C', 'server/src/tokenRegistry.ts:writeStoredToken:mongo', '[DEBUG] Writing token to MongoDB', {
+        address: document.address,
+        symbol: document.symbol,
+      });
+      // #endregion
+      await StoredTokenModel.findOneAndUpdate(
+        { address: document.address },
+        { ...document, updatedAt: new Date() },
+        { upsert: true, setDefaultsOnInsert: true },
+      );
+    } else {
+      // #region debug-point E:write-stored-token-memory
+      emitDebug('E', 'server/src/tokenRegistry.ts:writeStoredToken:memory', '[DEBUG] Writing token to in-memory fallback', {
+        address: document.address,
+        symbol: document.symbol,
+      });
+      // #endregion
+      inMemoryTokens.set(document.address.toLowerCase(), document);
+    }
   }
 
   const redis = await getRedisClient();

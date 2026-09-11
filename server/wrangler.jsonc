@@ -9,9 +9,6 @@
 	"observability": {
 		"enabled": true
 	},
-  "triggers": {
-    "crons": ["* * * * *"]
-  },
 	"kv_namespaces": [
 		{
 			"binding": "TOKEN_STORAGE_KV",
