@@ -555,39 +555,42 @@ export function LaunchSubmitActions({
         value: effectiveLaunchFee + (pair === 'BNB' ? firstBuyAmount : BigInt(0)),
       });
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
-      if (predictedTokenAddress) {
+      const launchEvents = parseEventLogs({
+        abi: eagleFactoryAbi,
+        eventName: 'TokenLaunched',
+        logs: receipt.logs,
+        strict: false,
+      });
+      const matchedLaunchEvent =
+        launchEvents.find((event) =>
+          predictedTokenAddress ? event.args.token?.toLowerCase() === predictedTokenAddress.toLowerCase() : true,
+        ) ?? launchEvents[0];
+      const launchedTokenAddress = matchedLaunchEvent?.args.token ?? predictedTokenAddress;
+
+      if (launchedTokenAddress) {
         try {
-          const launchEvents = parseEventLogs({
-            abi: eagleFactoryAbi,
-            eventName: 'TokenLaunched',
-            logs: receipt.logs,
-            strict: false,
-          });
-          const launchEvent = launchEvents.find(
-            (event) => event.args.token?.toLowerCase() === predictedTokenAddress.toLowerCase(),
-          );
           const block = await publicClient.getBlock({ blockNumber: receipt.blockNumber });
           const poolAddress =
-            launchEvent?.args.pool ??
+            matchedLaunchEvent?.args.pool ??
             (await publicClient.readContract({
               address: eagleContracts.factory,
               abi: eagleFactoryAbi,
               functionName: 'launches',
-              args: [predictedTokenAddress],
+              args: [launchedTokenAddress],
             }).then((launchRecord) => launchRecord[2]));
           const quoteToken =
-            launchEvent?.args.quoteToken ??
+            matchedLaunchEvent?.args.quoteToken ??
             (await publicClient.readContract({
               address: eagleContracts.factory,
               abi: eagleFactoryAbi,
               functionName: 'launches',
-              args: [predictedTokenAddress],
+              args: [launchedTokenAddress],
             }).then((launchRecord) => launchRecord[1]));
           if (poolAddress && quoteToken) {
             await registerLaunchedTokenWithRetry({
-              address: predictedTokenAddress,
-              name: typeof launchEvent?.args.name === 'string' ? launchEvent.args.name : name.trim(),
-              symbol: typeof launchEvent?.args.symbol === 'string' ? launchEvent.args.symbol : ticker.trim(),
+              address: launchedTokenAddress,
+              name: typeof matchedLaunchEvent?.args.name === 'string' ? matchedLaunchEvent.args.name : name.trim(),
+              symbol: typeof matchedLaunchEvent?.args.symbol === 'string' ? matchedLaunchEvent.args.symbol : ticker.trim(),
               description: story.trim(),
               creator: address as Address,
               poolAddress,
@@ -595,8 +598,8 @@ export function LaunchSubmitActions({
               quoteSymbol: resolvedQuoteSymbol,
               totalSupply: parsedTotalSupply,
               metadataURI:
-                typeof launchEvent?.args.metadataURI === 'string' ? launchEvent.args.metadataURI : metadataUri,
-              feeTier: typeof launchEvent?.args.fee === 'number' ? launchEvent.args.fee : feeTier,
+                typeof matchedLaunchEvent?.args.metadataURI === 'string' ? matchedLaunchEvent.args.metadataURI : metadataUri,
+              feeTier: typeof matchedLaunchEvent?.args.fee === 'number' ? matchedLaunchEvent.args.fee : feeTier,
               launchedAt: new Date(Number(block.timestamp) * 1000).toISOString(),
             });
           }
@@ -605,7 +608,7 @@ export function LaunchSubmitActions({
         }
         try {
           await queueAutomaticVerification({
-            address: predictedTokenAddress,
+            address: launchedTokenAddress,
             name: name.trim(),
             symbol: ticker.trim(),
             totalSupply: parsedTotalSupply,
@@ -618,8 +621,8 @@ export function LaunchSubmitActions({
         }
       }
       setStatus(locale.launchSuccess);
-      if (predictedTokenAddress) {
-        router.push(`/token?address=${predictedTokenAddress}&lang=${lang}`);
+      if (launchedTokenAddress) {
+        router.push(`/token?address=${launchedTokenAddress}&lang=${lang}`);
       }
     } catch (error) {
       setStatus(normalizeError(error, locale.failedPrefix));
