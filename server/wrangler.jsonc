@@ -9,6 +9,13 @@
 	"observability": {
 		"enabled": true
 	},
+        "d1_databases": [
+                {
+                        "binding": "TOKEN_STORAGE_DB",
+                        "database_name": "eagle-token-storage",
+                        "database_id": "43e97f18-31c5-4ab1-be28-d2ff14fb76d7"
+                }
+        ],
 	"kv_namespaces": [
 		{
 			"binding": "TOKEN_STORAGE_KV",

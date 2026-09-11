@@ -163,11 +163,12 @@ export type RuntimeDiagnostics = {
   hasRedisUrl: boolean;
   hasRpcUrl: boolean;
   hasWorkerKv: boolean;
+  hasWorkerD1: boolean;
   mongoReadyState: number;
   inMemoryTokenCount: number;
   hasInMemorySyncState: boolean;
   lastFactorySyncAt: number;
-  storageBackend: 'memory' | 'mongo' | 'worker-kv';
+  storageBackend: 'memory' | 'mongo' | 'worker-kv' | 'worker-d1';
 };
 
 type StoredSyncStateDocument = {
@@ -185,6 +186,17 @@ type WorkerKvStore = {
   put(key: string, value: string): Promise<void>;
 };
 
+type WorkerD1Statement = {
+  bind(...values: unknown[]): WorkerD1Statement;
+  first<T>(): Promise<T | null>;
+  all<T>(): Promise<{ results: T[] }>;
+  run(): Promise<unknown>;
+};
+
+type WorkerD1Database = {
+  prepare(query: string): WorkerD1Statement;
+};
+
 type SerializedStoredToken = Omit<StoredTokenDocument, 'launchedAt' | 'updatedAt'> & {
   launchedAt: string;
   updatedAt: string;
@@ -192,6 +204,42 @@ type SerializedStoredToken = Omit<StoredTokenDocument, 'launchedAt' | 'updatedAt
 
 type SerializedStoredSyncState = Omit<StoredSyncStateDocument, 'updatedAt'> & {
   updatedAt: string;
+};
+
+type WorkerD1TokenRow = {
+  address: string;
+  name: string;
+  symbol: string;
+  quote_token: string;
+  quote_symbol: string;
+  price_usd: number;
+  change_24h: number;
+  market_cap: number;
+  volume_24h: number;
+  liquidity: number;
+  holders: number;
+  description: string;
+  creator: string;
+  pool_address: string;
+  official: number;
+  tags_json: string;
+  total_supply: string;
+  launched_at: string;
+  metadata_uri: string | null;
+  fee_tier: number | null;
+  chart_json: string;
+  trades_json: string;
+  updated_at: string;
+};
+
+type WorkerD1SyncStateRow = {
+  key: string;
+  sync_started_from: string;
+  last_synced_block: string;
+  latest_known_block: string;
+  last_sync_status: 'idle' | 'syncing' | 'done' | 'error';
+  last_sync_error: string;
+  updated_at: string;
 };
 
 const chartPointSchema = new Schema<ChartPoint>(
@@ -277,6 +325,7 @@ let redisClientPromise: Promise<RedisClientType | null> | null = null;
 let lastFactorySyncAt = 0;
 let syncInFlight: Promise<void> | null = null;
 let workerKvStore: WorkerKvStore | null = null;
+let workerD1Store: WorkerD1Database | null = null;
 
 function isWorkerRuntime() {
   return process.env.WORKER_RUNTIME === 'cloudflare';
@@ -284,6 +333,10 @@ function isWorkerRuntime() {
 
 function getWorkerKvStore() {
   return isWorkerRuntime() ? workerKvStore : null;
+}
+
+function getWorkerD1Store() {
+  return isWorkerRuntime() ? workerD1Store : null;
 }
 
 function serializeStoredToken(document: StoredTokenDocument): SerializedStoredToken {
@@ -316,7 +369,107 @@ function deserializeStoredSyncState(document: SerializedStoredSyncState): Stored
   };
 }
 
+function parseJsonValue<T>(value: string | null | undefined, fallback: T): T {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function deserializeD1StoredToken(row: WorkerD1TokenRow): StoredTokenDocument {
+  return {
+    address: row.address,
+    name: row.name,
+    symbol: row.symbol,
+    quoteToken: row.quote_token,
+    quoteSymbol: row.quote_symbol,
+    priceUsd: Number(row.price_usd ?? DEFAULT_QUOTE_TOKEN_PRICE),
+    change24h: Number(row.change_24h ?? 0),
+    marketCap: Number(row.market_cap ?? 0),
+    volume24h: Number(row.volume_24h ?? 0),
+    liquidity: Number(row.liquidity ?? 0),
+    holders: Number(row.holders ?? 0),
+    description: row.description ?? '',
+    creator: row.creator,
+    poolAddress: row.pool_address,
+    official: Boolean(row.official),
+    tags: parseJsonValue<string[]>(row.tags_json, ['New']),
+    totalSupply: row.total_supply,
+    launchedAt: new Date(row.launched_at),
+    metadataURI: row.metadata_uri ?? undefined,
+    feeTier: row.fee_tier ?? undefined,
+    chart: parseJsonValue<ChartPoint[]>(row.chart_json, []),
+    trades: parseJsonValue<TokenTrade[]>(row.trades_json, []),
+    updatedAt: new Date(row.updated_at),
+  };
+}
+
+function deserializeD1SyncState(row: WorkerD1SyncStateRow): StoredSyncStateDocument {
+  return {
+    key: row.key,
+    syncStartedFrom: row.sync_started_from,
+    lastSyncedBlock: row.last_synced_block,
+    latestKnownBlock: row.latest_known_block,
+    lastSyncStatus: row.last_sync_status,
+    lastSyncError: row.last_sync_error,
+    updatedAt: new Date(row.updated_at),
+  };
+}
+
 async function readWorkerStoredTokens() {
+  const d1 = getWorkerD1Store();
+  if (d1) {
+    const result = await d1
+      .prepare(
+        `SELECT
+          address,
+          name,
+          symbol,
+          quote_token,
+          quote_symbol,
+          price_usd,
+          change_24h,
+          market_cap,
+          volume_24h,
+          liquidity,
+          holders,
+          description,
+          creator,
+          pool_address,
+          official,
+          tags_json,
+          total_supply,
+          launched_at,
+          metadata_uri,
+          fee_tier,
+          chart_json,
+          trades_json,
+          updated_at
+        FROM tokens
+        ORDER BY launched_at DESC`,
+      )
+      .all<WorkerD1TokenRow>();
+    const d1Tokens = result.results.map(deserializeD1StoredToken);
+    const kv = getWorkerKvStore();
+    if (!kv) {
+      return d1Tokens;
+    }
+    const payload = (await kv.get(WORKER_TOKENS_KV_KEY, {
+      type: 'json',
+    })) as SerializedStoredToken[] | null;
+    const kvTokens = (payload ?? []).map(deserializeStoredToken);
+    const mergedTokens = new Map<string, StoredTokenDocument>();
+    for (const token of kvTokens) {
+      mergedTokens.set(token.address, token);
+    }
+    for (const token of d1Tokens) {
+      mergedTokens.set(token.address, token);
+    }
+    return [...mergedTokens.values()].sort((left, right) => right.launchedAt.getTime() - left.launchedAt.getTime());
+  }
+
   const kv = getWorkerKvStore();
   if (!kv) return null;
   const payload = (await kv.get(WORKER_TOKENS_KV_KEY, {
@@ -325,14 +478,143 @@ async function readWorkerStoredTokens() {
   return (payload ?? []).map(deserializeStoredToken);
 }
 
-async function writeWorkerStoredTokens(tokens: StoredTokenDocument[]) {
+async function readWorkerStoredToken(address: string) {
+  const d1 = getWorkerD1Store();
+  if (d1) {
+    const row = await d1
+      .prepare(
+        `SELECT
+          address,
+          name,
+          symbol,
+          quote_token,
+          quote_symbol,
+          price_usd,
+          change_24h,
+          market_cap,
+          volume_24h,
+          liquidity,
+          holders,
+          description,
+          creator,
+          pool_address,
+          official,
+          tags_json,
+          total_supply,
+          launched_at,
+          metadata_uri,
+          fee_tier,
+          chart_json,
+          trades_json,
+          updated_at
+        FROM tokens
+        WHERE address = ?`,
+      )
+      .bind(address.toLowerCase())
+      .first<WorkerD1TokenRow>();
+    if (row) {
+      return deserializeD1StoredToken(row);
+    }
+  }
+
+  const tokens = await readWorkerStoredTokens();
+  return tokens?.find((entry) => entry.address === address.toLowerCase()) ?? null;
+}
+
+async function writeWorkerStoredToken(document: StoredTokenDocument) {
+  const d1 = getWorkerD1Store();
+  if (d1) {
+    try {
+      await d1
+        .prepare(
+          `INSERT INTO tokens (
+            address,
+            name,
+            symbol,
+            quote_token,
+            quote_symbol,
+            price_usd,
+            change_24h,
+            market_cap,
+            volume_24h,
+            liquidity,
+            holders,
+            description,
+            creator,
+            pool_address,
+            official,
+            tags_json,
+            total_supply,
+            launched_at,
+            metadata_uri,
+            fee_tier,
+            chart_json,
+            trades_json,
+            updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(address) DO UPDATE SET
+            name = excluded.name,
+            symbol = excluded.symbol,
+            quote_token = excluded.quote_token,
+            quote_symbol = excluded.quote_symbol,
+            price_usd = excluded.price_usd,
+            change_24h = excluded.change_24h,
+            market_cap = excluded.market_cap,
+            volume_24h = excluded.volume_24h,
+            liquidity = excluded.liquidity,
+            holders = excluded.holders,
+            description = excluded.description,
+            creator = excluded.creator,
+            pool_address = excluded.pool_address,
+            official = excluded.official,
+            tags_json = excluded.tags_json,
+            total_supply = excluded.total_supply,
+            launched_at = excluded.launched_at,
+            metadata_uri = excluded.metadata_uri,
+            fee_tier = excluded.fee_tier,
+            chart_json = excluded.chart_json,
+            trades_json = excluded.trades_json,
+            updated_at = excluded.updated_at`,
+        )
+        .bind(
+          document.address.toLowerCase(),
+          document.name,
+          document.symbol,
+          document.quoteToken.toLowerCase(),
+          document.quoteSymbol,
+          document.priceUsd,
+          document.change24h,
+          document.marketCap,
+          document.volume24h,
+          document.liquidity,
+          document.holders,
+          document.description,
+          document.creator.toLowerCase(),
+          document.poolAddress.toLowerCase(),
+          document.official ? 1 : 0,
+          JSON.stringify(document.tags),
+          document.totalSupply,
+          document.launchedAt.toISOString(),
+          document.metadataURI ?? null,
+          document.feeTier ?? null,
+          JSON.stringify(document.chart),
+          JSON.stringify(document.trades),
+          document.updatedAt.toISOString(),
+        )
+        .run();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   const kv = getWorkerKvStore();
   if (!kv) return false;
   try {
-    await kv.put(
-      WORKER_TOKENS_KV_KEY,
-      JSON.stringify(tokens.map(serializeStoredToken)),
-    );
+    const tokens = await readWorkerStoredTokens();
+    const nextTokens = (tokens ?? []).filter((entry) => entry.address !== document.address);
+    nextTokens.push(document);
+    await kv.put(WORKER_TOKENS_KV_KEY, JSON.stringify(nextTokens.map(serializeStoredToken)));
     return true;
   } catch {
     return false;
@@ -340,6 +622,28 @@ async function writeWorkerStoredTokens(tokens: StoredTokenDocument[]) {
 }
 
 async function readWorkerSyncState() {
+  const d1 = getWorkerD1Store();
+  if (d1) {
+    const row = await d1
+      .prepare(
+        `SELECT
+          key,
+          sync_started_from,
+          last_synced_block,
+          latest_known_block,
+          last_sync_status,
+          last_sync_error,
+          updated_at
+        FROM sync_state
+        WHERE key = ?`,
+      )
+      .bind(FACTORY_SYNC_STATE_KEY)
+      .first<WorkerD1SyncStateRow>();
+    if (row) {
+      return deserializeD1SyncState(row);
+    }
+  }
+
   const kv = getWorkerKvStore();
   if (!kv) return null;
   const payload = (await kv.get(WORKER_SYNC_STATE_KV_KEY, {
@@ -349,6 +653,44 @@ async function readWorkerSyncState() {
 }
 
 async function writeWorkerSyncState(document: StoredSyncStateDocument) {
+  const d1 = getWorkerD1Store();
+  if (d1) {
+    try {
+      await d1
+        .prepare(
+          `INSERT INTO sync_state (
+            key,
+            sync_started_from,
+            last_synced_block,
+            latest_known_block,
+            last_sync_status,
+            last_sync_error,
+            updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(key) DO UPDATE SET
+            sync_started_from = excluded.sync_started_from,
+            last_synced_block = excluded.last_synced_block,
+            latest_known_block = excluded.latest_known_block,
+            last_sync_status = excluded.last_sync_status,
+            last_sync_error = excluded.last_sync_error,
+            updated_at = excluded.updated_at`,
+        )
+        .bind(
+          document.key,
+          document.syncStartedFrom,
+          document.lastSyncedBlock,
+          document.latestKnownBlock,
+          document.lastSyncStatus,
+          document.lastSyncError,
+          document.updatedAt.toISOString(),
+        )
+        .run();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   const kv = getWorkerKvStore();
   if (!kv) return false;
   try {
@@ -507,8 +849,7 @@ function buildOverview(tokens: TokenRecord[], fallback: FallbackOverview) {
     return new Date(right.launchedAt).getTime() - new Date(left.launchedAt).getTime();
   });
   const trending = [...sortedTokens]
-    .sort((left, right) => right.volume24h + right.marketCap - (left.volume24h + left.marketCap))
-    .slice(0, Math.min(sortedTokens.length, 3));
+    .sort((left, right) => right.volume24h + right.marketCap - (left.volume24h + left.marketCap));
   return {
     chain: fallback.chain,
     launchedCount: sortedTokens.length,
@@ -616,14 +957,13 @@ async function readStoredTokens() {
 }
 
 async function writeStoredToken(document: StoredTokenDocument) {
-  const workerTokens = await readWorkerStoredTokens();
-  if (workerTokens) {
-    const nextTokens = workerTokens.filter((entry) => entry.address !== document.address);
-    nextTokens.push(document);
-    if (await writeWorkerStoredTokens(nextTokens)) {
+  const hasWorkerStorage = Boolean(getWorkerD1Store() || getWorkerKvStore());
+  if (hasWorkerStorage) {
+    if (await writeWorkerStoredToken(document)) {
       inMemoryTokens.set(document.address.toLowerCase(), document);
       return;
     }
+    inMemoryTokens.set(document.address.toLowerCase(), document);
   } else {
     const connection = await getMongoConnection();
     if (connection) {
@@ -660,9 +1000,14 @@ async function writeStoredToken(document: StoredTokenDocument) {
 
 async function readStoredToken(address: string) {
   const normalized = address.toLowerCase();
+  const workerToken = await readWorkerStoredToken(normalized);
+  if (workerToken) {
+    return workerToken;
+  }
+
   const workerTokens = await readWorkerStoredTokens();
   if (workerTokens) {
-    return workerTokens.find((entry) => entry.address === normalized) ?? null;
+    return null;
   }
 
   const connection = await getMongoConnection();
@@ -1011,8 +1356,10 @@ export async function forceFactorySync(options?: { reset?: boolean }) {
 }
 
 export function getRuntimeDiagnostics(): RuntimeDiagnostics {
-  const storageBackend: RuntimeDiagnostics['storageBackend'] = getWorkerKvStore()
-    ? 'worker-kv'
+  const storageBackend: RuntimeDiagnostics['storageBackend'] = getWorkerD1Store()
+    ? 'worker-d1'
+    : getWorkerKvStore()
+      ? 'worker-kv'
     : process.env.MONGODB_URI?.trim()
       ? 'mongo'
       : 'memory';
@@ -1022,6 +1369,7 @@ export function getRuntimeDiagnostics(): RuntimeDiagnostics {
     hasRedisUrl: Boolean(process.env.REDIS_URL?.trim()),
     hasRpcUrl: Boolean(process.env.BSC_RPC_URL?.trim()),
     hasWorkerKv: Boolean(getWorkerKvStore()),
+    hasWorkerD1: Boolean(getWorkerD1Store()),
     mongoReadyState: mongoose.connection.readyState,
     inMemoryTokenCount: inMemoryTokens.size,
     hasInMemorySyncState: Boolean(inMemorySyncState),
@@ -1030,8 +1378,12 @@ export function getRuntimeDiagnostics(): RuntimeDiagnostics {
   };
 }
 
-export function setWorkerStorageBindings(bindings: { TOKEN_STORAGE_KV?: WorkerKvStore | null }) {
+export function setWorkerStorageBindings(bindings: {
+  TOKEN_STORAGE_KV?: WorkerKvStore | null;
+  TOKEN_STORAGE_DB?: WorkerD1Database | null;
+}) {
   workerKvStore = bindings.TOKEN_STORAGE_KV ?? null;
+  workerD1Store = bindings.TOKEN_STORAGE_DB ?? null;
 }
 
 export async function registerTokenLaunch(payload: RegisterTokenPayload) {

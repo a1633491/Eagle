@@ -4,6 +4,8 @@
 
 This project now has a Cloudflare Workers entrypoint in `src/worker.ts`.
 
+The recommended storage backend is now **Cloudflare D1** for token records and sync state. KV can remain configured as a fallback during migration, but high-frequency writes should move to D1.
+
 Supported routes:
 
 - `GET /`
@@ -56,6 +58,24 @@ TOKEN_SYNC_COOLDOWN_MS=30000
 npm run dev:worker
 ```
 
+## D1 setup
+
+1. Create the D1 database:
+
+```bash
+npx wrangler d1 create eagle-token-storage
+```
+
+2. Copy the returned `database_id` into the commented `d1_databases` block in `wrangler.jsonc`.
+
+3. Apply the migration:
+
+```bash
+npx wrangler d1 migrations apply eagle-token-storage
+```
+
+The schema file lives at `migrations/0001_init_token_storage.sql`.
+
 ## Deploy
 
 ```bash
@@ -64,6 +84,7 @@ npm run deploy:worker
 
 ## Notes
 
+- D1 is the primary Workers storage target for `tokens` and `sync_state`.
 - Redis is intentionally disabled in the Workers runtime in the current implementation.
 - MongoDB is still used, but the runtime uses smaller pool and timeout settings to reduce Workers-side connection pressure.
 - If `GET /api/tokens/sync-status` stays at zeroes after deploy, trigger:

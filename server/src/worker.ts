@@ -13,6 +13,13 @@ import {
   type RegisterTokenPayload,
 } from './tokenRegistry.js';
 
+type WorkerD1Statement = {
+  bind(...values: unknown[]): WorkerD1Statement;
+  first<T>(): Promise<T | null>;
+  all<T>(): Promise<{ results: T[] }>;
+  run(): Promise<unknown>;
+};
+
 type WorkerBindings = {
   TOKEN_IMAGE_BUCKET?: {
     put(
@@ -37,6 +44,9 @@ type WorkerBindings = {
   TOKEN_STORAGE_KV?: {
     get(key: string, options?: { type?: 'text' | 'json' }): Promise<unknown>;
     put(key: string, value: string): Promise<void>;
+  };
+  TOKEN_STORAGE_DB?: {
+    prepare(query: string): WorkerD1Statement;
   };
   WORKER_RUNTIME?: string;
   MONGODB_URI?: string;
@@ -66,9 +76,12 @@ const fail = (msg: string, code = 400) => ({ code, msg, data: null });
 
 function applyBindings(bindings: WorkerBindings) {
   process.env.WORKER_RUNTIME = 'cloudflare';
-  setWorkerStorageBindings({ TOKEN_STORAGE_KV: bindings.TOKEN_STORAGE_KV ?? null });
+  setWorkerStorageBindings({
+    TOKEN_STORAGE_KV: bindings.TOKEN_STORAGE_KV ?? null,
+    TOKEN_STORAGE_DB: bindings.TOKEN_STORAGE_DB ?? null,
+  });
   for (const [key, value] of Object.entries(bindings)) {
-    if (key === 'WORKER_RUNTIME' || key === 'TOKEN_STORAGE_KV' || key === 'TOKEN_IMAGE_BUCKET') continue;
+    if (key === 'WORKER_RUNTIME' || key === 'TOKEN_STORAGE_KV' || key === 'TOKEN_STORAGE_DB' || key === 'TOKEN_IMAGE_BUCKET') continue;
     if (value === undefined) {
       delete process.env[key];
       continue;
