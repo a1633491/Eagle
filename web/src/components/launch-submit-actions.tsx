@@ -32,7 +32,8 @@ type LaunchSubmitActionsProps = {
   name: string;
   ticker: string;
   story: string;
-  imageDataUrl: string;
+  imageUrl: string;
+  imageUploading: boolean;
   pair: PairKey;
   feeTarget: 'wallet' | 'holders';
   firstBuy: string;
@@ -59,6 +60,7 @@ const copy = {
     missingFields: '请先填写代币名称、代码和有效的配对代币地址。',
     holdersPending: '正在计算持有人分发地址，请稍候。',
     invalidParams: '请检查总供应量和首购保护参数是否有效。',
+    imageUploading: '代币头像上传中，请稍候...',
     loadingQuotePrice: '正在根据配对币价格计算默认开盘价...',
     quotePriceUnavailable: '暂时无法获取该配对币价格，当前不能按默认开盘价发射。',
     waitingApproval: '等待钱包授权首购资产...',
@@ -83,6 +85,7 @@ const copy = {
     missingFields: 'Fill in token name, ticker, and a valid quote token address.',
     holdersPending: 'Calculating holder distributor address...',
     invalidParams: 'Check total supply and first buy protection values.',
+    imageUploading: 'Token image is uploading. Please wait...',
     loadingQuotePrice: 'Calculating the default starting price from the quote token...',
     quotePriceUnavailable: 'A usable USD price for this quote token is unavailable right now.',
     waitingApproval: 'Waiting for wallet approval...',
@@ -107,6 +110,7 @@ const copy = {
     missingFields: 'トークン名、ティッカー、有効なペアトークンアドレスを入力してください。',
     holdersPending: '保有者分配アドレスを計算しています...',
     invalidParams: '総供給量と初回購入保護の値を確認してください。',
+    imageUploading: 'トークン画像をアップロード中です。少々お待ちください。',
     loadingQuotePrice: 'ペアトークン価格からデフォルト開始価格を計算しています...',
     quotePriceUnavailable: 'このペアトークンの価格を取得できないため、現在はローンチできません。',
     waitingApproval: 'ウォレット承認を待っています...',
@@ -274,7 +278,8 @@ export function LaunchSubmitActions({
   name,
   ticker,
   story,
-  imageDataUrl,
+  imageUrl,
+  imageUploading,
   pair,
   feeTarget,
   firstBuy,
@@ -400,10 +405,10 @@ export function LaunchSubmitActions({
       name: name.trim(),
       symbol: ticker.trim(),
       description: story.trim(),
-      image: imageDataUrl || undefined,
+      image: imageUrl || undefined,
     });
     return `data:application/json,${encodeURIComponent(payload)}`;
-  }, [imageDataUrl, name, story, ticker]);
+  }, [imageUrl, name, story, ticker]);
 
   const readyForPrediction = Boolean(address && name.trim() && ticker.trim());
 
@@ -470,6 +475,7 @@ export function LaunchSubmitActions({
     parsedTotalSupply !== undefined &&
     parsedInitialTick !== undefined &&
     parsedInitialBuyMinTokensOut !== undefined &&
+    !imageUploading &&
     !quotePriceLoading &&
     tickAligned &&
     (feeTarget !== 'holders' || Boolean(predictedDistributorAddress)) &&
@@ -657,6 +663,8 @@ export function LaunchSubmitActions({
           ? locale.walletRequired
           : !name.trim() || !ticker.trim() || !resolvedQuoteToken || firstBuyAmount === undefined
             ? locale.missingFields
+            : imageUploading
+              ? locale.imageUploading
             : quotePriceLoading
               ? locale.loadingQuotePrice
               : quoteUsdPrice === undefined

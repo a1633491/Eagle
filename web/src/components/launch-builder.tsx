@@ -12,6 +12,8 @@ const pairOptions = [
   { key: 'ANY', label: 'Any BSC token', subtitle: '', icon: '' },
 ] as const;
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000/api';
+
 const copy = {
   zh: {
     native: '原生',
@@ -113,9 +115,11 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
   const [name, setName] = useState('');
   const [ticker, setTicker] = useState('');
   const [story, setStory] = useState('');
-  const [imageDataUrl, setImageDataUrl] = useState('');
+  const [imagePreviewUrl, setImagePreviewUrl] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
   const [imageFileName, setImageFileName] = useState('');
   const [imageError, setImageError] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
   const [pair, setPair] = useState<(typeof pairOptions)[number]['key']>('BNB');
   const [feeTarget, setFeeTarget] = useState<'wallet' | 'holders'>('wallet');
   const [firstBuy, setFirstBuy] = useState('0.00');
@@ -140,6 +144,32 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
     subtitle: option.key === 'BNB' ? locale.native : option.key === 'USDT' ? locale.stable : option.subtitle,
   }));
 
+  async function uploadImage(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${API_BASE}/uploads/token-image`, {
+      method: 'POST',
+      body: formData,
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!response.ok) {
+      throw new Error(`上传失败 (${response.status})`);
+    }
+
+    const payload = (await response.json()) as {
+      code: number;
+      data?: { imageUrl?: string };
+      msg?: string;
+    };
+
+    if (!payload.data?.imageUrl) {
+      throw new Error(payload.msg || '上传失败');
+    }
+
+    return payload.data.imageUrl;
+  }
+
   function readImageFile(file: File) {
     if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type)) {
       setImageError('仅支持 PNG、JPG、GIF、WebP');
@@ -150,17 +180,24 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : '';
-      setImageDataUrl(result);
-      setImageFileName(file.name);
-      setImageError('');
-    };
-    reader.onerror = () => {
-      setImageError('图片读取失败，请重试');
-    };
-    reader.readAsDataURL(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setImageFileName(file.name);
+    setImageError('');
+    setImageUploading(true);
+    setImageUrl('');
+
+    uploadImage(file)
+      .then((nextImageUrl) => {
+        setImageUrl(nextImageUrl);
+        setImageError('');
+      })
+      .catch((error) => {
+        setImageUrl('');
+        setImageError(error instanceof Error ? error.message : '图片上传失败，请重试');
+      })
+      .finally(() => {
+        setImageUploading(false);
+      });
   }
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
@@ -216,10 +253,10 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
               <label className='mb-2 block text-sm font-medium text-[#f3f1e8]'>{t(lang, 'addTokenImage')}</label>
               <div className='rounded-[22px] border border-dashed border-white/12 bg-[#131512] p-5'>
                 <div className='flex items-center gap-3'>
-                  {imageDataUrl ? (
+                  {imagePreviewUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={imageDataUrl}
+                      src={imagePreviewUrl}
                       alt='Token preview'
                       className='h-12 w-12 rounded-full border border-white/10 object-cover'
                     />
@@ -249,6 +286,7 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
                     {t(lang, 'chooseFile')}
                   </button>
                   <span className='text-xs text-[#8f9482]'>{imageFileName || t(lang, 'noFileChosen')}</span>
+                  {imageUploading ? <span className='text-xs text-[#d8c483]'>上传中...</span> : null}
                 </div>
                 {imageError ? <p className='mt-3 text-xs text-[#f87171]'>{imageError}</p> : null}
               </div>
@@ -474,7 +512,8 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
               name={name}
               ticker={ticker}
               story={story}
-          imageDataUrl={imageDataUrl}
+              imageUrl={imageUrl}
+              imageUploading={imageUploading}
               pair={pair}
               feeTarget={feeTarget}
               firstBuy={firstBuy}

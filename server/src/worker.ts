@@ -14,6 +14,26 @@ import {
 } from './tokenRegistry.js';
 
 type WorkerBindings = {
+  TOKEN_IMAGE_BUCKET?: {
+    put(
+      key: string,
+      value: Blob,
+      options?: {
+        httpMetadata?: {
+          contentType?: string;
+          cacheControl?: string;
+        };
+      },
+    ): Promise<void>;
+    get(key: string): Promise<{
+      body: ReadableStream<Uint8Array> | null;
+      httpMetadata?: {
+        contentType?: string;
+        cacheControl?: string;
+      };
+      size: number;
+    } | null>;
+  };
   TOKEN_STORAGE_KV?: {
     get(key: string, options?: { type?: 'text' | 'json' }): Promise<unknown>;
     put(key: string, value: string): Promise<void>;
@@ -48,7 +68,7 @@ function applyBindings(bindings: WorkerBindings) {
   process.env.WORKER_RUNTIME = 'cloudflare';
   setWorkerStorageBindings({ TOKEN_STORAGE_KV: bindings.TOKEN_STORAGE_KV ?? null });
   for (const [key, value] of Object.entries(bindings)) {
-    if (key === 'WORKER_RUNTIME' || key === 'TOKEN_STORAGE_KV') continue;
+    if (key === 'WORKER_RUNTIME' || key === 'TOKEN_STORAGE_KV' || key === 'TOKEN_IMAGE_BUCKET') continue;
     if (value === undefined) {
       delete process.env[key];
       continue;
@@ -57,6 +77,18 @@ function applyBindings(bindings: WorkerBindings) {
       process.env[key] = value;
     }
   }
+}
+
+function sanitizeImageExtension(type: string, fallbackName: string) {
+  if (type === 'image/png') return 'png';
+  if (type === 'image/jpeg') return 'jpg';
+  if (type === 'image/gif') return 'gif';
+  if (type === 'image/webp') return 'webp';
+  const suffix = fallbackName.split('.').pop()?.toLowerCase();
+  if (suffix && ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(suffix)) {
+    return suffix === 'jpeg' ? 'jpg' : suffix;
+  }
+  return 'bin';
 }
 
 app.use('*', cors());
@@ -117,6 +149,62 @@ app.post('/api/tokens/register', async (c) => {
     const message = error instanceof Error ? error.message : 'Failed to register token';
     return c.json(fail(message), 400);
   }
+});
+
+app.post('/api/uploads/token-image', async (c) => {
+  try {
+    const bucket = c.env.TOKEN_IMAGE_BUCKET;
+    if (!bucket) {
+      return c.json(fail('Token image bucket is not configured', 500), 500);
+    }
+
+    const formData = await c.req.formData();
+    const file = formData.get('file');
+    if (!(file instanceof File)) {
+      return c.json(fail('Image file is required'));
+    }
+
+    if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type)) {
+      return c.json(fail('Unsupported image format'));
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return c.json(fail('Image size exceeds 5 MB'));
+    }
+
+    const extension = sanitizeImageExtension(file.type, file.name);
+    const objectKey = `token-image-${Date.now()}-${crypto.randomUUID()}.${extension}`;
+    await bucket.put(objectKey, file, {
+      httpMetadata: {
+        contentType: file.type,
+        cacheControl: 'public, max-age=31536000, immutable',
+      },
+    });
+
+    const imageUrl = `${new URL(c.req.url).origin}/api/images/${objectKey}`;
+    return c.json(ok({ key: objectKey, imageUrl }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to upload token image';
+    return c.json(fail(message, 500), 500);
+  }
+});
+
+app.get('/api/images/:key', async (c) => {
+  const bucket = c.env.TOKEN_IMAGE_BUCKET;
+  if (!bucket) {
+    return c.json(fail('Token image bucket is not configured', 500), 500);
+  }
+
+  const object = await bucket.get(c.req.param('key'));
+  if (!object?.body) {
+    return c.json(fail('Image not found', 404), 404);
+  }
+
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': object.httpMetadata?.contentType ?? 'application/octet-stream',
+      'Cache-Control': object.httpMetadata?.cacheControl ?? 'public, max-age=31536000, immutable',
+    },
+  });
 });
 
 app.get('/api/tokens/:address', async (c) => {

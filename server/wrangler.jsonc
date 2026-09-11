@@ -17,5 +17,11 @@
 			"binding": "TOKEN_STORAGE_KV",
 			"id": "2d9c29ad12b047ffb7046f81c712b869"
 		}
+        ],
+        "r2_buckets": [
+                {
+                        "binding": "TOKEN_IMAGE_BUCKET",
+                        "bucket_name": "eagle-token-images"
+                }
 	]
 }
