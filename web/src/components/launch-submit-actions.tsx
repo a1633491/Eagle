@@ -474,7 +474,7 @@ export function LaunchSubmitActions({
     return zeroAddress;
   }, [feeTarget, feeWallet, predictedDistributorAddress]);
 
-  const canLaunch =
+  const formReady =
     isConnected &&
     Boolean(address) &&
     Boolean(name.trim()) &&
@@ -487,8 +487,10 @@ export function LaunchSubmitActions({
     !imageUploading &&
     !quotePriceLoading &&
     tickAligned &&
-    (feeTarget !== 'holders' || Boolean(predictedDistributorAddress)) &&
-    approvalSatisfied;
+    (feeTarget !== 'holders' || Boolean(predictedDistributorAddress));
+
+  const canLaunch = formReady && approvalSatisfied;
+  const canApprove = formReady && needsApproval && !approvalSatisfied;
 
   async function handleApprove() {
     if (!resolvedQuoteToken || !firstBuyAmount || firstBuyAmount <= BigInt(0) || !publicClient) return;
@@ -689,7 +691,7 @@ export function LaunchSubmitActions({
         <button
           type='button'
           onClick={primaryAction}
-          disabled={!canLaunch || isBusy}
+          disabled={!(approvalSatisfied ? canLaunch : canApprove) || isBusy}
           className='inline-flex h-11 items-center rounded-full border border-[#f6e3ac66] bg-[linear-gradient(145deg,#f7e8ba,#d1b773)] px-5 text-sm font-medium text-[#342d1a] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60'
         >
           {isBusy ? '...' : primaryLabel}
