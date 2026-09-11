@@ -53,6 +53,10 @@ function tokenArtType(token: TokenDetail) {
   return key % 3;
 }
 
+function pairBadge(token: TokenDetail) {
+  return `${token.quoteSymbol}/${token.symbol}`;
+}
+
 export function HomeExploreTabs({
   lang,
   query,
@@ -106,67 +110,66 @@ export function HomeExploreTabs({
           </button>
         ))}
       </div>
-      <section className='grid grid-cols-2 gap-6 pt-3 max-[720px]:grid-cols-1'>
+      <section className='grid grid-cols-2 gap-3 pt-4 sm:gap-5'>
         {visibleTokens.map((token) => (
           <Link
             key={token.address}
             href={withLang(`/token?address=${token.address}`, lang)}
             aria-label={`${t(lang, 'explore')} ${token.name}`}
-            className='flex min-h-0 w-full flex-col overflow-hidden rounded-[32px] border border-[#43473d] bg-[linear-gradient(180deg,#1a1d18,#171916_55%,#151714)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-[#555b4b]'
+            className='flex min-h-0 w-full flex-col overflow-hidden rounded-[24px] border border-[#30352f] bg-[#161917] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition hover:border-[#4a5147]'
           >
             <div
-              className='relative flex aspect-square w-full items-center justify-center overflow-hidden border-b border-white/6'
+              className='relative flex aspect-square w-full items-center justify-center overflow-hidden border-b border-white/6 bg-[#1c211d]'
               style={tokenArtStyle(token)}
             >
-              <div className='absolute inset-0 bg-[radial-gradient(circle_at_35%_28%,rgba(255,255,255,0.42),rgba(255,255,255,0)_46%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(0,0,0,0.18))]' />
-              <span className='absolute left-4 top-4 inline-flex items-center gap-1 rounded-full bg-[#61533d] px-3 py-2 text-[11px] leading-none text-[#f2e5bb] shadow-[0_2px_8px_rgba(0,0,0,0.16)]'>
-                <span>◆</span>
-                {token.quoteSymbol}
+              <div className='absolute inset-0 bg-[radial-gradient(circle_at_35%_28%,rgba(255,255,255,0.24),rgba(255,255,255,0)_44%),linear-gradient(180deg,rgba(0,0,0,0.02),rgba(0,0,0,0.22))]' />
+              <span className='absolute left-3 top-3 inline-flex items-center rounded-full border border-[#8f7a43]/40 bg-[#201d15]/88 px-2.5 py-1 text-[10px] font-medium leading-none text-[#efe0ac] shadow-[0_2px_8px_rgba(0,0,0,0.18)] sm:left-4 sm:top-4 sm:px-3'>
+                {pairBadge(token)}
               </span>
               {getTokenImageUrl(token.metadataURI) ? (
-            <div
-                  className='relative h-24 w-24 overflow-hidden rounded-full border border-white/15 shadow-[0_14px_40px_rgba(0,0,0,0.28)]'
-            >
                 <img
-                    src={getTokenImageUrl(token.metadataURI)}
+                  src={getTokenImageUrl(token.metadataURI)}
                   alt={token.name}
-                    className='h-full w-full object-cover'
+                  className='relative h-full w-full object-cover'
                 />
-                </div>
               ) : tokenArtType(token) === 0 ? (
-                <EagleMark className='relative h-20 w-20 opacity-95' />
+                <EagleMark className='relative h-20 w-20 opacity-90 sm:h-24 sm:w-24' />
               ) : tokenArtType(token) === 1 ? (
-                <div className='relative flex h-20 w-20 items-center justify-center rounded-full bg-[#fff7ea]/85 text-[2rem] font-semibold text-[#8a5d2b] shadow-[0_10px_30px_rgba(0,0,0,0.14)]'>
+                <div className='relative flex h-20 w-20 items-center justify-center rounded-full bg-[#fff7ea]/85 text-[1.8rem] font-semibold text-[#8a5d2b] shadow-[0_10px_30px_rgba(0,0,0,0.14)] sm:h-24 sm:w-24 sm:text-[2.2rem]'>
                   {tokenInitials(token)}
                 </div>
               ) : (
                 <div className='relative text-center'>
-                  <div className='text-[3.4rem] leading-none text-white/90'>◌</div>
-                  <div className='-mt-5 text-[1.65rem] font-semibold tracking-[-0.08em] text-white/82'>{tokenInitials(token)}</div>
+                  <div className='text-[3rem] leading-none text-white/90 sm:text-[3.4rem]'>◌</div>
+                  <div className='-mt-4 text-[1.4rem] font-semibold tracking-[-0.08em] text-white/82 sm:-mt-5 sm:text-[1.65rem]'>
+                    {tokenInitials(token)}
+                  </div>
                 </div>
               )}
             </div>
-            <div className='flex min-h-[176px] flex-1 flex-col p-5'>
-              <div className='flex flex-wrap items-center gap-2'>
-                <h2 className='text-[1rem] font-semibold leading-6 tracking-[-0.03em] text-[#f3f1e8]'>{token.name}</h2>
+            <div className='flex min-h-[156px] flex-1 flex-col bg-[#121513] p-3.5 sm:min-h-[176px] sm:p-5'>
+              <div className='flex flex-wrap items-center gap-1.5 sm:gap-2'>
+                <h2 className='truncate text-[0.95rem] font-semibold leading-6 tracking-[-0.03em] text-[#f3f1e8] sm:text-[1rem]'>
+                  {token.name}
+                </h2>
                 {token.official ? (
-                  <span className='inline-flex items-center gap-1 rounded-[14px] border border-[#857348] bg-[#2a281f] px-2.5 py-1 text-[11px] text-[#f0dfae]'>
+                  <span className='inline-flex items-center gap-1 rounded-[14px] border border-[#857348] bg-[#2a281f] px-2 py-0.5 text-[10px] text-[#f0dfae] sm:px-2.5 sm:py-1 sm:text-[11px]'>
                     <span className='text-[10px]'>✦</span>
                     {t(lang, 'official')}
                   </span>
                 ) : null}
               </div>
-              <span className='mt-1 block text-[13px] leading-5 text-[#b9bdae]'>${token.symbol}</span>
-              <div className='mt-4 flex items-baseline gap-1 text-[#efe7c8]'>
-                <strong className='text-[0.98rem] font-semibold'>{compactCurrency(token.marketCap)}</strong>
-                <small className='text-[12px] text-[#9ca08d]'>{t(lang, 'mc')}</small>
+              <span className='mt-0.5 block text-[12px] leading-5 text-[#c5b47d] sm:mt-1 sm:text-[13px]'>${token.symbol}</span>
+              <div className='mt-3 flex items-baseline justify-between gap-2 text-[#efe7c8] sm:mt-4'>
+                <small className='text-[11px] text-[#8f9482] sm:text-[12px]'>{t(lang, 'mc')}</small>
+                <strong className='text-[0.9rem] font-semibold sm:text-[0.98rem]'>{compactCurrency(token.marketCap)}</strong>
               </div>
-              <div className='mt-2.5 flex items-baseline gap-1 text-[#aeb3a3]'>
-                <span className='text-[13px] font-medium'>{compactCurrency(token.volume24h)}</span>
-                <small className='text-[12px] text-[#8f9482]'>{t(lang, 'vol')}</small>
+              <div className='mt-1.5 flex items-baseline justify-between gap-2 text-[#d6d7cf] sm:mt-2.5'>
+                <small className='text-[11px] text-[#8f9482] sm:text-[12px]'>{t(lang, 'vol')}</small>
+                <span className='text-[12px] font-medium sm:text-[13px]'>{compactCurrency(token.volume24h)}</span>
               </div>
-              <div className='mt-auto flex items-center justify-between gap-3 pt-5 text-[12px] leading-5 text-[#8f9482]'>
-                <span>{shorten(token.address)}</span>
+              <div className='mt-auto flex flex-col gap-1.5 pt-4 text-[11px] leading-5 text-[#8f9482] sm:pt-5 sm:text-[12px]'>
+                <span className='truncate'>{shorten(token.address, 5, 4)}</span>
                 <time dateTime={token.launchedAgo}>{token.launchedAgo}</time>
               </div>
             </div>

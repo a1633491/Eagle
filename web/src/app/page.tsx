@@ -18,7 +18,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   return (
     <div className='min-h-screen bg-[#151714]'>
       <MarketHeader overview={overview} />
-      <main className='mx-auto w-full max-w-[728px] px-4 pb-16 pt-4 sm:px-5'>
+      <main className='mx-auto w-full max-w-[980px] px-4 pb-16 pt-4 sm:px-5'>
         <section className='mb-5 flex items-center gap-2 sm:gap-3'>
           <form action='/' className='flex-1'>
             <input type='hidden' name='lang' value={lang} />
