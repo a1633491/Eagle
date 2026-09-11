@@ -231,8 +231,8 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
 
   return (
     <>
-      <section className='space-y-5'>
-        <div className='rounded-[24px] border border-white/8 bg-[#1a1c19]/96 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.25)]'>
+      <section className='min-w-0 space-y-5'>
+        <div className='rounded-[24px] border border-white/8 bg-[#1a1c19]/96 p-4 shadow-[0_8px_30px_rgba(0,0,0,0.25)] sm:p-5'>
           <div className='mb-1 text-[13px] text-[#8f9482]'>
             <span className='text-[#cfd3c3]'>{t(lang, 'explore')}</span>
             <span className='mx-1'>/</span>
@@ -240,7 +240,7 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
           </div>
           <div className='mb-1 text-[13px] text-[#8f9482]'>{t(lang, 'bnbChain')}</div>
           <div className='flex flex-wrap items-start justify-between gap-4'>
-            <div>
+            <div className='min-w-0'>
               <div className='mt-1.5 flex items-center gap-3'>
                 {imageUrl ? (
                   <img
@@ -253,11 +253,11 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
                     {symbol.slice(0, 2)}
                   </div>
                 )}
-                <div>
-                  <h1 className='text-[2rem] font-semibold tracking-[-0.06em] text-[#f3f1e8]'>{symbol}</h1>
+                <div className='min-w-0'>
+                  <h1 className='truncate text-[1.6rem] font-semibold tracking-[-0.06em] text-[#f3f1e8] sm:text-[2rem]'>{symbol}</h1>
                   <div className='mt-0.5 flex flex-wrap items-center gap-2 text-[13px] text-[#c6c8bd]'>
                     {token.official ? <span className='text-[#d8c483]'>{t(lang, 'official')}</span> : null}
-                    <span>{displayName}</span>
+                    <span className='break-all sm:break-normal'>{displayName}</span>
                     <span>${symbol}</span>
                   </div>
                 </div>
@@ -285,16 +285,16 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
                 ))}
               </div>
             </div>
-            <div className='text-right'>
+            <div className='text-left sm:text-right'>
               <p className='text-[13px] text-[#8f9482]'>{t(lang, 'priceUsd')}</p>
-              <p className='mt-1 text-[2rem] font-semibold text-[#f3f1e8]'>{currency(liveToken.priceUsd)}</p>
+              <p className='mt-1 text-[1.6rem] font-semibold text-[#f3f1e8] sm:text-[2rem]'>{currency(liveToken.priceUsd)}</p>
               <p className={`mt-1 text-[13px] ${liveToken.change24h >= 0 ? 'text-[#8fd19e]' : 'text-[#e28989]'}`}>{percent(liveToken.change24h)} 24h</p>
               <p className='mt-1 text-xs text-[#8f9482]'>{t(lang, 'live')}</p>
             </div>
           </div>
           <p className='mt-4 max-w-3xl text-[13px] leading-6 text-[#b6bba9]'>{token.description}</p>
         </div>
-        <div className='grid gap-3 md:grid-cols-4'>
+        <div className='grid grid-cols-2 gap-3 md:grid-cols-4'>
           <MetricCard label={t(lang, 'marketCapLabel')} value={currency(liveToken.marketCap)} />
           <MetricCard label={t(lang, 'volume24h')} value={currency(liveToken.volume24h)} />
           <MetricCard label={t(lang, 'holders')} value='—' />
@@ -305,10 +305,10 @@ export function TokenPageContent({ lang, token }: { lang: Lang; token: TokenDeta
         </div>
         <TokenMarketSections lang={lang} token={liveToken} />
       </section>
-      <aside className='space-y-6'>
+      <aside className='min-w-0 space-y-6'>
         <SwapPanel lang={lang} token={liveToken} creatorClaimableText={creatorClaimableText} />
         <TokenChainActions lang={lang} tokenAddress={token.address} />
-        <div className='rounded-[24px] border border-white/8 bg-[#1a1c19]/96 p-5'>
+        <div className='rounded-[24px] border border-white/8 bg-[#1a1c19]/96 p-4 sm:p-5'>
           <h2 className='text-lg font-semibold text-[#f3f1e8]'>{t(lang, 'tokenDetails')}</h2>
           <div className='mt-4 divide-y divide-white/6 rounded-[18px] border border-white/8 bg-[#131512] text-sm text-[#a8ad99]'>
             <DetailRow label={t(lang, 'tradingPair')} value={pairLabel} />
@@ -349,18 +349,18 @@ function MetricCard({ label, value }: { label: string; value: string }) {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className='flex items-center justify-between gap-4 px-4 py-3'>
+    <div className='flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
       <span>{label}</span>
-      <span className='text-right text-[#f3f1e8]'>{value}</span>
+      <span className='break-all text-left text-[#f3f1e8] sm:text-right'>{value}</span>
     </div>
   );
 }
 
 function DetailLink({ href, label, value }: { href: string; label: string; value: string }) {
   return (
-    <div className='flex items-center justify-between gap-4 px-4 py-3'>
+    <div className='flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
       <span>{label}</span>
-      <a href={href} target='_blank' rel='noreferrer' className='inline-flex items-center gap-1 text-[#f3f1e8] transition hover:text-[#f1e4b7]'>
+      <a href={href} target='_blank' rel='noreferrer' className='inline-flex break-all text-left items-center gap-1 text-[#f3f1e8] transition hover:text-[#f1e4b7] sm:text-right'>
         {value}
         <ArrowUpRight className='h-3.5 w-3.5' />
       </a>

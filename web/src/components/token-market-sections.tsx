@@ -64,8 +64,8 @@ export function TokenMarketSections({ lang, token }: { lang: Lang; token: TokenD
 
   return (
     <>
-      <div className='rounded-[24px] border border-white/8 bg-[#1a1c19]/96 p-5'>
-        <div className='mb-4 flex items-center justify-between'>
+      <div className='rounded-[24px] border border-white/8 bg-[#1a1c19]/96 p-4 sm:p-5'>
+        <div className='mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
           <div>
             <p className='text-[13px] text-[#8f9482]'>
               {quoteMode === 'usd' ? 'USD' : token.quoteSymbol} · {t(lang, 'marketHistory')}
@@ -103,8 +103,8 @@ export function TokenMarketSections({ lang, token }: { lang: Lang; token: TokenD
         <TokenPriceChart data={chartData} />
       </div>
 
-      <div className='rounded-[24px] border border-white/8 bg-[#1a1c19]/96 p-5'>
-        <div className='mb-4 flex items-center justify-between'>
+      <div className='rounded-[24px] border border-white/8 bg-[#1a1c19]/96 p-4 sm:p-5'>
+        <div className='mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
           <div className='flex flex-wrap items-center gap-4 border-b border-white/8 pb-2.5 text-[13px]'>
             {topTabs.map((tab) => (
               <button
@@ -117,7 +117,7 @@ export function TokenMarketSections({ lang, token }: { lang: Lang; token: TokenD
               </button>
             ))}
           </div>
-          <div className='flex items-center gap-2 rounded-full border border-white/10 bg-[#131512] px-3 py-2 text-xs text-[#a3a899]'>
+          <div className='inline-flex items-center gap-2 self-start rounded-full border border-white/10 bg-[#131512] px-3 py-2 text-xs text-[#a3a899] sm:self-auto'>
             <ShieldCheck className='h-4 w-4 text-[#d8c483]' />
             {t(lang, 'liveSample')}
           </div>
@@ -145,8 +145,8 @@ export function TokenMarketSections({ lang, token }: { lang: Lang; token: TokenD
                 </button>
               ))}
             </div>
-            <div className='overflow-hidden rounded-[18px] border border-white/8'>
-              <table className='min-w-full text-left text-[12px] text-[#cbd0c3]'>
+            <div className='overflow-x-auto rounded-[18px] border border-white/8'>
+              <table className='min-w-[720px] text-left text-[12px] text-[#cbd0c3]'>
                 <thead className='bg-[#131512] text-xs uppercase tracking-wide text-[#8f9482]'>
                   <tr>
                     <th className='px-4 py-3 font-medium'>{t(lang, 'time')}</th>

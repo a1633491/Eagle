@@ -18,8 +18,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   return (
     <div className='min-h-screen bg-[#151714]'>
       <MarketHeader overview={overview} />
-      <main className='mx-auto w-full max-w-[728px] px-5 pb-16 pt-4'>
-        <section className='mb-5 flex items-center gap-3'>
+      <main className='mx-auto w-full max-w-[728px] px-4 pb-16 pt-4 sm:px-5'>
+        <section className='mb-5 flex items-center gap-2 sm:gap-3'>
           <form action='/' className='flex-1'>
             <input type='hidden' name='lang' value={lang} />
             <label className='flex h-13 items-center gap-3 rounded-full border border-[#3f443a] bg-[#1a1d18] px-5 text-[#cfd3c3] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition focus-within:border-[#5b624f]'>
@@ -38,12 +38,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             className='button primary launch-create-button'
           >
             <Plus className='h-4 w-4 shrink-0' />
-            {t(lang, 'create')}
+            <span className='hidden sm:inline'>{t(lang, 'create')}</span>
           </Link>
         </section>
         <section className='mb-0.5'>
-          <div className='flex items-end gap-3'>
-            <h1 className='text-[2.35rem] font-semibold tracking-[-0.065em] text-[#f4eed7]'>{t(lang, 'explore')}</h1>
+          <div className='flex flex-wrap items-end gap-2 sm:gap-3'>
+            <h1 className='text-[1.9rem] font-semibold tracking-[-0.065em] text-[#f4eed7] sm:text-[2.35rem]'>{t(lang, 'explore')}</h1>
             <span className='pb-1 text-[12px] leading-5 text-[#8f9482]'>
               {overview.launchedCount} {t(lang, 'launchedSuffix')}
             </span>

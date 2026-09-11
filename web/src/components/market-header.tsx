@@ -30,12 +30,12 @@ export function MarketHeader({ overview }: { overview: MarketOverview }) {
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/8 bg-[#151714]/88 backdrop-blur-xl">
-      <div className="mx-auto flex h-[62px] w-full max-w-6xl items-center gap-3 px-4 lg:px-6">
+      <div className="mx-auto flex h-[62px] w-full max-w-6xl items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:px-6">
         <Link href={withLang('/')} className="flex items-center gap-2.5 text-[#f4eed7]">
           <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e8d79f2c] bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.14),rgba(255,255,255,0.03)_46%,rgba(10,12,10,0.12)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_8px_rgba(0,0,0,0.14)]">
             <EagleMark className="h-7 w-7" />
           </span>
-          <span className="text-[1.55rem] font-semibold tracking-[-0.07em]">Eagle.</span>
+          <span className="hidden text-[1.55rem] font-semibold tracking-[-0.07em] min-[380px]:inline">Eagle.</span>
         </Link>
         <div className="hidden h-10 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 text-[13px] text-[#d2d5c9] md:flex">
           <span>{overview.chain}</span>
@@ -61,7 +61,7 @@ export function MarketHeader({ overview }: { overview: MarketOverview }) {
               aria-label="Language"
               value={lang}
               onChange={(event) => router.push(switchLangHref(event.target.value as Lang))}
-              className="h-10 appearance-none rounded-full bg-transparent pl-3.5 pr-9 text-[12px] text-[#f1e4b7] outline-none"
+              className="h-10 appearance-none rounded-full bg-transparent pl-3 pr-8 text-[12px] text-[#f1e4b7] outline-none sm:pl-3.5 sm:pr-9"
             >
               <option value="en" className="bg-[#151714] text-[#f1e4b7]">
                 EN

@@ -208,11 +208,11 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
 
   return (
     <div className='grid gap-6 lg:grid-cols-[minmax(0,1fr)_390px]'>
-      <section className='space-y-5'>
+      <section className='min-w-0 space-y-5'>
         <div className='max-w-3xl text-center lg:text-left'>
           <p className='text-[11px] font-medium uppercase tracking-[0.24em] text-[#9da28f]'>{t(lang, 'madeForYourIdea')}</p>
-          <h1 className='mt-3.5 text-[2.55rem] font-semibold tracking-[-0.065em] text-[#f3f1e8]'>{t(lang, 'littleIdea')}</h1>
-          <h2 className='text-[2.2rem] font-semibold tracking-[-0.065em] text-[#f3f1e8]'>{t(lang, 'wholeNewToken')}</h2>
+          <h1 className='mt-3.5 text-[2rem] font-semibold tracking-[-0.065em] text-[#f3f1e8] sm:text-[2.55rem]'>{t(lang, 'littleIdea')}</h1>
+          <h2 className='text-[1.7rem] font-semibold tracking-[-0.065em] text-[#f3f1e8] sm:text-[2.2rem]'>{t(lang, 'wholeNewToken')}</h2>
           <p className='mt-2.5 text-[15px] leading-7 text-[#a8ad99]'>
             {t(lang, 'makeItYoursLead')}
           </p>
@@ -239,7 +239,7 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
           </span>
         </div>
 
-        <div id='story' className='rounded-[28px] border border-white/8 bg-[#1a1c19]/96 p-5.5'>
+        <div id='story' className='rounded-[28px] border border-white/8 bg-[#1a1c19]/96 p-4 sm:p-5.5'>
           <div className='mb-5 flex items-start justify-between gap-4'>
             <div>
               <h3 className='text-[1.65rem] font-semibold tracking-[-0.05em] text-[#f3f1e8]'>{t(lang, 'startWithStory')}</h3>
@@ -350,7 +350,7 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
           </div>
         </div>
 
-        <div id='pair' className='rounded-[28px] border border-white/8 bg-[#1a1c19]/96 p-5.5'>
+        <div id='pair' className='rounded-[28px] border border-white/8 bg-[#1a1c19]/96 p-4 sm:p-5.5'>
           <div className='mb-5 flex items-start justify-between gap-4'>
             <div>
               <h3 className='text-[1.65rem] font-semibold tracking-[-0.05em] text-[#f3f1e8]'>{t(lang, 'findPerfectPair')}</h3>
@@ -527,8 +527,8 @@ export function LaunchBuilder({ lang }: { lang: Lang }) {
         </div>
       </section>
 
-      <aside className='lg:sticky lg:top-20 lg:self-start'>
-        <div className='rounded-[28px] border border-white/8 bg-[#1a1c19]/96 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.22)]'>
+      <aside className='min-w-0 lg:sticky lg:top-20 lg:self-start'>
+        <div className='rounded-[28px] border border-white/8 bg-[#1a1c19]/96 p-4 shadow-[0_8px_30px_rgba(0,0,0,0.22)] sm:p-5'>
           <div className='mb-5 flex items-center justify-between'>
             <div>
               <p className='text-xs font-medium uppercase tracking-[0.18em] text-[#8f9482]'>{t(lang, 'livePreview')}</p>

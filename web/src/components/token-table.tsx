@@ -6,8 +6,8 @@ import { TokenSummary } from '@/lib/types';
 
 export function TokenTable({ tokens }: { tokens: TokenSummary[] }) {
   return (
-    <div className="overflow-hidden rounded-[22px] border border-white/8 bg-[#1a1c19]/95">
-      <table className="min-w-full text-left text-sm text-[#cad0c0]">
+    <div className="overflow-x-auto rounded-[22px] border border-white/8 bg-[#1a1c19]/95">
+      <table className="min-w-[760px] text-left text-sm text-[#cad0c0]">
         <thead className="border-b border-white/8 bg-[#131512] text-xs uppercase tracking-wide text-[#8f9482]">
           <tr>
             <th className="px-4 py-3 font-medium">Token</th>
