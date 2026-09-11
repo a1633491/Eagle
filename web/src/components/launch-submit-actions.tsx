@@ -452,7 +452,7 @@ export function LaunchSubmitActions({
 
   const needsApproval = pair !== 'BNB' && Boolean(firstBuyAmount && firstBuyAmount > BigInt(0));
 
-  const { data: currentAllowance } = useReadContract({
+  const { data: currentAllowance, refetch: refetchAllowance } = useReadContract({
     address: resolvedQuoteToken,
     abi: eagleErc20Abi,
     functionName: 'allowance',
@@ -504,6 +504,7 @@ export function LaunchSubmitActions({
         args: [eagleContracts.factory, firstBuyAmount],
       });
       await publicClient.waitForTransactionReceipt({ hash });
+      await refetchAllowance();
       setStatus(locale.approvalSuccess);
     } catch (error) {
       setStatus(normalizeError(error, locale.failedPrefix));
