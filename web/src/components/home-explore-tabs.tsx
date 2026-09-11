@@ -9,6 +9,7 @@ import { getTokenImageUrl } from '@/lib/token-image';
 import { TokenDetail } from '@/lib/types';
 
 type ExploreTab = 'trending' | 'market-cap' | 'new';
+const PINNED_OFFICIAL_TOKEN_ADDRESS = '0x281BF1DA0412B997ADA3aa38cf22001370E6e12F'.toLowerCase();
 
 function parseLaunchedAgo(value: string) {
   const match = value.match(/(\d+)\s*(min|hr|day)/i);
@@ -57,6 +58,17 @@ function pairBadge(token: TokenDetail) {
   return `${token.quoteSymbol}/${token.symbol}`;
 }
 
+function sortTokens<T extends { address: string }>(tokens: T[], compare: (left: T, right: T) => number) {
+  return [...tokens].sort((left, right) => {
+    const leftPinned = left.address.toLowerCase() === PINNED_OFFICIAL_TOKEN_ADDRESS;
+    const rightPinned = right.address.toLowerCase() === PINNED_OFFICIAL_TOKEN_ADDRESS;
+    if (leftPinned !== rightPinned) {
+      return leftPinned ? -1 : 1;
+    }
+    return compare(left, right);
+  });
+}
+
 export function HomeExploreTabs({
   lang,
   query,
@@ -72,12 +84,12 @@ export function HomeExploreTabs({
 
   const activeTokens = useMemo(() => {
     if (activeTab === 'market-cap') {
-      return [...tokens].sort((a, b) => b.marketCap - a.marketCap);
+      return sortTokens(tokens, (a, b) => b.marketCap - a.marketCap);
     }
     if (activeTab === 'new') {
-      return [...tokens].sort((a, b) => parseLaunchedAgo(a.launchedAgo) - parseLaunchedAgo(b.launchedAgo));
+      return sortTokens(tokens, (a, b) => parseLaunchedAgo(a.launchedAgo) - parseLaunchedAgo(b.launchedAgo));
     }
-    return trending;
+    return sortTokens(trending, () => 0);
   }, [activeTab, tokens, trending]);
 
   const visibleTokens = useMemo(() => {

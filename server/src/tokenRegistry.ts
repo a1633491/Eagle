@@ -12,6 +12,7 @@ const DEFAULT_CACHE_TTL_SECONDS = 30;
 const FACTORY_SYNC_STATE_KEY = 'factory-launch-sync';
 const WORKER_TOKENS_KV_KEY = 'tokens:all';
 const WORKER_SYNC_STATE_KV_KEY = `sync:${FACTORY_SYNC_STATE_KEY}`;
+const PINNED_OFFICIAL_TOKEN_ADDRESS = '0x281BF1DA0412B997ADA3aa38cf22001370E6e12F'.toLowerCase();
 const DEBUG_SERVER_URL = 'http://127.0.0.1:7777/event';
 const DEBUG_SESSION_ID = 'token-list-missing';
 const DEBUG_ENABLED = process.env.ENABLE_DEBUG_LOGS === '1';
@@ -798,6 +799,21 @@ function buildTotalSupplyLabel(totalSupply: string, symbol: string) {
   return `${compactAmount(amount)} ${symbol}`;
 }
 
+function isPinnedOfficialToken(address: string) {
+  return address.toLowerCase() === PINNED_OFFICIAL_TOKEN_ADDRESS;
+}
+
+function sortTokenRecords<T extends { address: string }>(tokens: T[], compare: (left: T, right: T) => number) {
+  return [...tokens].sort((left, right) => {
+    const leftPinned = isPinnedOfficialToken(left.address);
+    const rightPinned = isPinnedOfficialToken(right.address);
+    if (leftPinned !== rightPinned) {
+      return leftPinned ? -1 : 1;
+    }
+    return compare(left, right);
+  });
+}
+
 function extractImageUrl(metadataURI?: string) {
   const trimmed = metadataURI?.trim();
   if (!trimmed) return '';
@@ -829,7 +845,7 @@ function toTokenRecord(document: StoredTokenDocument): TokenRecord {
     description: document.description,
     creator: document.creator,
     poolAddress: document.poolAddress,
-    official: document.official,
+    official: document.official || isPinnedOfficialToken(document.address),
     tags: document.tags,
     totalSupply: buildTotalSupplyLabel(document.totalSupply, document.symbol),
     launchedDate: formatLaunchedDate(document.launchedAt),
@@ -845,11 +861,12 @@ function toTokenRecord(document: StoredTokenDocument): TokenRecord {
 }
 
 function buildOverview(tokens: TokenRecord[], fallback: FallbackOverview) {
-  const sortedTokens = [...tokens].sort((left, right) => {
+  const sortedTokens = sortTokenRecords(tokens, (left, right) => {
     return new Date(right.launchedAt).getTime() - new Date(left.launchedAt).getTime();
   });
-  const trending = [...sortedTokens]
-    .sort((left, right) => right.volume24h + right.marketCap - (left.volume24h + left.marketCap));
+  const trending = sortTokenRecords(sortedTokens, (left, right) => {
+    return right.volume24h + right.marketCap - (left.volume24h + left.marketCap);
+  });
   return {
     chain: fallback.chain,
     launchedCount: sortedTokens.length,
@@ -1159,7 +1176,7 @@ async function makeStoredToken(payload: RegisterTokenPayload): Promise<StoredTok
     description: payload.description?.trim() ?? '',
     creator: normalizedCreator.toLowerCase(),
     poolAddress: (dexSnapshot?.poolAddress && isAddress(dexSnapshot.poolAddress) ? normalizeAddress(dexSnapshot.poolAddress) : normalizedPool).toLowerCase(),
-    official: false,
+    official: isPinnedOfficialToken(normalizedAddress),
     tags: ['New'],
     totalSupply: payload.totalSupply.trim(),
     launchedAt,

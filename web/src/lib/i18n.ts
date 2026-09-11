@@ -4,7 +4,7 @@ export function normalizeLang(value?: string): Lang {
   if (value === 'en' || value === 'ja' || value === 'zh') {
     return value;
   }
-  return 'zh';
+  return 'en';
 }
 
 const messages = {
