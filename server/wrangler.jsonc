@@ -6,6 +6,9 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+        "browser": {
+                "binding": "BROWSER"
+        },
         "vars": {
                 "ROBINHOOD_RPC_URL": "https://robinhood.drpc.org",
                 "ROBINHOOD_FACTORY_ADDRESS": "0x3A4CE33bb65b9429465b6EAda2F29C9f7bF0a122",

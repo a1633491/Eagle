@@ -17,6 +17,7 @@
     "verify:robinhood-v4:sourcify": "hardhat run scripts/verify-robinhood-v4-sourcify.js --network robinhood",
     "verify:token:bsc": "hardhat run scripts/verify-token.js --network bsc",
     "verify:token:base": "hardhat run scripts/verify-token.js --network base",
+    "verify:token:robinhood": "hardhat run scripts/verify-token.js --network robinhood",
     "set-launch-fee:bsc": "hardhat run scripts/set-launch-fee.js --network bsc",
     "set-launch-fee:base": "hardhat run scripts/set-launch-fee.js --network base",
     "set-launch-fee:robinhood": "hardhat run scripts/set-launch-fee.js --network robinhood"

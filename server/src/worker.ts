@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { launch } from '@cloudflare/playwright';
 import { marketOverview, tokenDetails } from './data/mockData.js';
 import { getChainConfig, normalizeChainKey } from './chainConfig.js';
 import {
@@ -22,6 +23,7 @@ type WorkerD1Statement = {
 };
 
 type WorkerBindings = {
+  BROWSER?: unknown;
   TOKEN_IMAGE_BUCKET?: {
     put(
       key: string,
@@ -64,6 +66,7 @@ type WorkerBindings = {
   ROBINHOOD_WETH_ADDRESS?: string;
   ROBINHOOD_STABLE_SYMBOL?: string;
   ROBINHOOD_STABLE_TOKEN_ADDRESS?: string;
+  ROBINHOODSCAN_API_KEY?: string;
   UNISWAP_API_KEY?: string;
   UNISWAP_QUOTE_URL?: string;
   UNISWAP_ROUTER_VERSION?: string;
@@ -99,6 +102,20 @@ type SwapQuoteRequest = {
 type SwapBuildRequest = {
   quote?: Record<string, unknown>;
 };
+
+type VerifyTokenRequest = {
+  chainKey?: string;
+  address?: string;
+  name?: string;
+  symbol?: string;
+  totalSupply?: string;
+  factoryAddress?: string;
+  metadataURI?: string;
+  creator?: string;
+};
+
+const BREW_LAUNCH_SUITE_SOURCE_URL =
+  'https://raw.githubusercontent.com/a1633491/Eagle/main/contracts-recovered/contracts/BrewLaunchSuite.sol';
 
 function getUniswapHeaders(bindings: WorkerBindings) {
   return {
@@ -168,6 +185,244 @@ function sanitizeImageExtension(type: string, fallbackName: string) {
     return suffix === 'jpeg' ? 'jpg' : suffix;
   }
   return 'bin';
+}
+
+function isAddress(value: unknown): value is `0x${string}` {
+  return typeof value === 'string' && /^0x[a-fA-F0-9]{40}$/.test(value);
+}
+
+function inferVerifyChainKey(payload: VerifyTokenRequest, bindings: WorkerBindings) {
+  const requested = typeof payload.chainKey === 'string' ? normalizeChainKey(payload.chainKey) : undefined;
+  if (requested) return requested;
+
+  const factoryAddress = payload.factoryAddress?.toLowerCase();
+  if (!factoryAddress) return undefined;
+  if (bindings.ROBINHOOD_FACTORY_ADDRESS?.toLowerCase() === factoryAddress) return 'robinhood';
+  if (bindings.BASE_FACTORY_ADDRESS?.toLowerCase() === factoryAddress) return 'base';
+  if (bindings.EAGLE_FACTORY_ADDRESS?.toLowerCase() === factoryAddress) return 'bsc';
+  return undefined;
+}
+
+function encodeUint256Hex(value: bigint) {
+  return value.toString(16).padStart(64, '0');
+}
+
+function encodeAddressHex(value: string) {
+  return value.toLowerCase().replace(/^0x/, '').padStart(64, '0');
+}
+
+function encodeDynamicBytesHex(value: Uint8Array) {
+  const lengthHex = encodeUint256Hex(BigInt(value.length));
+  const bodyHex = Array.from(value, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  const padding = (64 - (bodyHex.length % 64)) % 64;
+  return `${lengthHex}${bodyHex}${'0'.repeat(padding)}`;
+}
+
+function utf8Hex(value: string) {
+  return new TextEncoder().encode(value);
+}
+
+function encodeEagleTokenConstructorArguments(args: {
+  name: string;
+  symbol: string;
+  totalSupply: bigint;
+  factoryAddress: string;
+  metadataURI: string;
+  creator: string;
+}) {
+  const headSize = 6 * 32;
+  const nameTail = encodeDynamicBytesHex(utf8Hex(args.name));
+  const symbolTail = encodeDynamicBytesHex(utf8Hex(args.symbol));
+  const metadataTail = encodeDynamicBytesHex(utf8Hex(args.metadataURI));
+
+  const nameOffset = headSize;
+  const symbolOffset = nameOffset + nameTail.length / 2;
+  const metadataOffset = symbolOffset + symbolTail.length / 2;
+
+  return [
+    encodeUint256Hex(BigInt(nameOffset)),
+    encodeUint256Hex(BigInt(symbolOffset)),
+    encodeUint256Hex(args.totalSupply),
+    encodeAddressHex(args.factoryAddress),
+    encodeUint256Hex(BigInt(metadataOffset)),
+    encodeAddressHex(args.creator),
+    nameTail,
+    symbolTail,
+    metadataTail,
+  ].join('');
+}
+
+async function buildEagleTokenStandardJsonInput() {
+  const sourceResponse = await fetch(BREW_LAUNCH_SUITE_SOURCE_URL);
+  if (!sourceResponse.ok) {
+    throw new Error(`Failed to load BrewLaunchSuite source (${sourceResponse.status})`);
+  }
+
+  const source = await sourceResponse.text();
+  return JSON.stringify({
+    language: 'Solidity',
+    sources: {
+      'contracts/BrewLaunchSuite.sol': {
+        content: source,
+      },
+    },
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 800,
+      },
+      viaIR: true,
+      evmVersion: 'paris',
+      outputSelection: {
+        '*': {
+          '*': ['abi', 'evm.bytecode', 'evm.deployedBytecode', 'evm.methodIdentifiers', 'metadata'],
+          '': ['ast'],
+        },
+      },
+    },
+  });
+}
+
+async function fillFirstMatchingInput(page: any, selectors: string[], value: string) {
+  for (const selector of selectors) {
+    const locator = page.locator(selector).first();
+    if ((await locator.count()) === 0) {
+      continue;
+    }
+    try {
+      await locator.fill(value, { timeout: 2_000 });
+      return true;
+    } catch {
+      continue;
+    }
+  }
+  return false;
+}
+
+async function selectFirstMatchingValue(page: any, selectors: string[], value: string) {
+  for (const selector of selectors) {
+    const locator = page.locator(selector).first();
+    if ((await locator.count()) === 0) {
+      continue;
+    }
+    try {
+      await locator.selectOption({ value }, { timeout: 2_000 });
+      return true;
+    } catch {
+      try {
+        await locator.selectOption({ label: value }, { timeout: 2_000 });
+        return true;
+      } catch {
+        continue;
+      }
+    }
+  }
+  return false;
+}
+
+async function submitRobinhoodTokenVerification(bindings: WorkerBindings, payload: Required<VerifyTokenRequest>) {
+  if (!bindings.BROWSER) {
+    throw new Error('Cloudflare Browser binding is not configured');
+  }
+
+  const standardJsonInput = await buildEagleTokenStandardJsonInput();
+  const constructorArguments = encodeEagleTokenConstructorArguments({
+    name: payload.name,
+    symbol: payload.symbol,
+    totalSupply: BigInt(payload.totalSupply),
+    factoryAddress: payload.factoryAddress,
+    metadataURI: payload.metadataURI,
+    creator: payload.creator,
+  });
+  const browser = await launch(bindings.BROWSER as never);
+
+  try {
+    const page = await browser.newPage();
+    page.setDefaultTimeout(30_000);
+    const verificationUrl = `https://robinhoodchain.blockscout.com/address/${payload.address}/contract-verification?type=solidity-standard-json-input`;
+
+    await page.goto(verificationUrl, { waitUntil: 'domcontentloaded' });
+
+    const consentButton = page.getByRole('button', { name: /accept/i }).first();
+    if ((await consentButton.count()) > 0) {
+      try {
+        await consentButton.click({ timeout: 2_000 });
+      } catch {
+        // Ignore cookie overlays when they are not actionable.
+      }
+    }
+
+    const fileInput = page.locator('input[type="file"][name="sources"]').first();
+    await fileInput.waitFor({ state: 'attached', timeout: 30_000 });
+    await fileInput.setInputFiles({
+      name: 'eagletoken-robinhood-standard-input.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(standardJsonInput, 'utf8'),
+    });
+
+    await fillFirstMatchingInput(
+      page,
+      [
+        'textarea[name="constructor_arguments"]',
+        'textarea[name="constructorArguments"]',
+        'input[name="constructor_arguments"]',
+        'input[name="constructorArguments"]',
+        'textarea[placeholder*="constructor" i]',
+        'input[placeholder*="constructor" i]',
+      ],
+      constructorArguments,
+    );
+
+    await fillFirstMatchingInput(
+      page,
+      [
+        'input[name="contract_name"]',
+        'input[name="contractName"]',
+        'input[placeholder*="contract name" i]',
+      ],
+      'contracts/BrewLaunchSuite.sol:EagleToken',
+    );
+
+    await selectFirstMatchingValue(
+      page,
+      ['select[name="compiler_version"]', 'select[name="compilerVersion"]'],
+      'v0.8.24+commit.e11b9ed9',
+    );
+
+    const responsePromise = page.waitForResponse(
+      (response: { request(): { method(): string }; url(): string }) =>
+        response.request().method() === 'POST' &&
+        response.url().includes('/verification/via/standard-input'),
+      { timeout: 45_000 },
+    );
+
+    const verifyButton = page.getByRole('button', { name: /verify\s*&\s*publish/i }).first();
+    await verifyButton.click();
+
+    const response = await responsePromise;
+    const bodyText = await response.text();
+
+    if (!response.ok) {
+      throw new Error(`Explorer rejected browser verification (${response.status}): ${bodyText.slice(0, 500)}`);
+    }
+
+    const parsed = JSON.parse(bodyText) as { message?: string; errors?: unknown; status?: string; guid?: string };
+    const message = typeof parsed.message === 'string' ? parsed.message : 'Verification submitted';
+    if (/already verified/i.test(message)) {
+      return { status: 'already_verified', message };
+    }
+
+    return {
+      status: parsed.status || 'submitted',
+      guid: typeof parsed.guid === 'string' ? parsed.guid : '',
+      message,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Browser verification failed';
+    throw new Error(message);
+  } finally {
+    await browser.close();
+  }
 }
 
 app.use('*', cors());
@@ -393,8 +648,49 @@ app.get('/api/tokens/:address/trades', async (c) => {
   }
 });
 
-app.post('/api/verify-token', (c) => {
-  return c.json(fail('verify-token is not supported on Cloudflare Workers', 501), 501);
+app.post('/api/verify-token', async (c) => {
+  try {
+    const payload = (await c.req.json<VerifyTokenRequest>().catch(() => ({}))) as VerifyTokenRequest;
+    const chainKey = inferVerifyChainKey(payload, c.env);
+
+    if (chainKey !== 'robinhood') {
+      return c.json(fail('verify-token currently supports Robinhood only on Cloudflare Workers', 501), 501);
+    }
+
+    if (
+      !isAddress(payload.address) ||
+      !isAddress(payload.factoryAddress) ||
+      !isAddress(payload.creator) ||
+      typeof payload.name !== 'string' ||
+      !payload.name.trim() ||
+      typeof payload.symbol !== 'string' ||
+      !payload.symbol.trim() ||
+      typeof payload.metadataURI !== 'string' ||
+      !payload.metadataURI.trim() ||
+      typeof payload.totalSupply !== 'string' ||
+      !/^\d+$/.test(payload.totalSupply.trim())
+    ) {
+      return c.json(fail('Invalid verification payload'), 400);
+    }
+
+    const jobPayload = {
+      chainKey,
+      address: payload.address,
+      name: payload.name.trim(),
+      symbol: payload.symbol.trim(),
+      totalSupply: payload.totalSupply.trim(),
+      factoryAddress: payload.factoryAddress,
+      metadataURI: payload.metadataURI.trim(),
+      creator: payload.creator,
+    };
+
+    c.executionCtx.waitUntil(submitRobinhoodTokenVerification(c.env, jobPayload).catch((error) => console.error('Robinhood verify-token failed', error)));
+
+    return c.json(ok({ chainKey, status: 'queued' }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to submit verification';
+    return c.json(fail(message, 500), 500);
+  }
 });
 
 async function runScheduledSync(bindings: WorkerBindings) {

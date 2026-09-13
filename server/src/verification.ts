@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 export type VerifyTokenRequest = {
+  chainKey: string;
   address: string;
   name: string;
   symbol: string;
@@ -20,6 +21,14 @@ function npmCommand() {
   return process.platform === 'win32' ? 'npm.cmd' : 'npm';
 }
 
+function normalizeVerifyChainKey(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'bsc' || normalized === 'base' || normalized === 'robinhood') {
+    return normalized;
+  }
+  return null;
+}
+
 function contractsProjectDir() {
   const configured = process.env.CONTRACTS_PROJECT_DIR?.trim();
   const projectDir = configured
@@ -34,6 +43,7 @@ function contractsProjectDir() {
 }
 
 export function validateVerifyTokenRequest(payload: VerifyTokenRequest) {
+  if (!normalizeVerifyChainKey(payload.chainKey)) return 'Invalid chain key';
   if (!isAddress(payload.address)) return 'Invalid token address';
   if (!isAddress(payload.factoryAddress)) return 'Invalid factory address';
   if (!isAddress(payload.creator)) return 'Invalid creator address';
@@ -46,13 +56,18 @@ export function validateVerifyTokenRequest(payload: VerifyTokenRequest) {
 
 export function queueTokenVerification(payload: VerifyTokenRequest) {
   const cwd = contractsProjectDir();
+  const chainKey = normalizeVerifyChainKey(payload.chainKey);
+  if (!chainKey) {
+    throw new Error(`Unsupported chain for verification: ${payload.chainKey}`);
+  }
   const child = spawn(
     npmCommand(),
-    ['run', 'verify:token:bsc'],
+    ['run', `verify:token:${chainKey}`],
     {
       cwd,
       env: {
         ...process.env,
+        VERIFY_TOKEN_CHAIN_KEY: chainKey,
         VERIFY_TOKEN_ADDRESS: payload.address,
         VERIFY_TOKEN_NAME: payload.name,
         VERIFY_TOKEN_SYMBOL: payload.symbol,

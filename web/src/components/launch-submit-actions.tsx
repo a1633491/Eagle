@@ -308,6 +308,7 @@ function buildLaunchMetadataUri(input: {
 }
 
 async function queueAutomaticVerification(payload: {
+  chainKey: ChainKey;
   address: Address;
   name: string;
   symbol: string;
@@ -791,6 +792,7 @@ export function LaunchSubmitActions({
         }
         try {
           await queueAutomaticVerification({
+            chainKey,
             address: launchedTokenAddress,
             name: name.trim(),
             symbol: ticker.trim(),
