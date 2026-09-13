@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { createConfig, http } from 'wagmi';
 import { injected } from 'wagmi/connectors';
 import { base, bsc } from 'wagmi/chains';
-import { robinhoodChain } from '@/lib/robinhood-v4';
+import { robinhoodChain, robinhoodPublicRpcUrl } from '@/lib/robinhood-v4';
 
 export const wagmiConfig = createConfig({
   chains: [bsc, base, robinhoodChain],
@@ -10,7 +10,7 @@ export const wagmiConfig = createConfig({
   transports: {
     [bsc.id]: http(),
     [base.id]: http(),
-    [robinhoodChain.id]: http(),
+    [robinhoodChain.id]: http(robinhoodPublicRpcUrl),
   },
   ssr: true,
 });

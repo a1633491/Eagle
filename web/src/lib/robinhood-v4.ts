@@ -1,5 +1,15 @@
 import { defineChain, type Address } from 'viem';
 
+const robinhoodRpcCandidates = Array.from(
+  new Set(
+    [
+      'https://robinhood.drpc.org',
+      process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL,
+      'https://rpc.mainnet.chain.robinhood.com',
+    ].filter((value): value is string => Boolean(value)),
+  ),
+);
+
 export const robinhoodChain = defineChain({
   id: 4663,
   name: 'Robinhood Chain',
@@ -10,10 +20,7 @@ export const robinhoodChain = defineChain({
   },
   rpcUrls: {
     default: {
-      http: [
-        process.env.NEXT_PUBLIC_ROBINHOOD_RPC_URL ?? 'https://rpc.mainnet.chain.robinhood.com',
-        'https://robinhood.drpc.org',
-      ],
+      http: robinhoodRpcCandidates,
     },
   },
   blockExplorers: {
@@ -23,6 +30,8 @@ export const robinhoodChain = defineChain({
     },
   },
 });
+
+export const robinhoodPublicRpcUrl = robinhoodRpcCandidates[0];
 
 export const robinhoodV4Contracts = {
   poolManager: (process.env.NEXT_PUBLIC_ROBINHOOD_V4_POOL_MANAGER ??

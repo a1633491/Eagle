@@ -8,11 +8,11 @@ To expose the Robinhood chain switch in the UI, set at minimum:
 
 ```bash
 NEXT_PUBLIC_ENABLE_ROBINHOOD_CHAIN=true
-NEXT_PUBLIC_ROBINHOOD_RPC_URL=https://rpc.mainnet.chain.robinhood.com
+NEXT_PUBLIC_ROBINHOOD_RPC_URL=https://robinhood.drpc.org
 NEXT_PUBLIC_ROBINHOOD_WETH_ADDRESS=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73
 ```
 
-If the public RPC is unstable from your region, switch `NEXT_PUBLIC_ROBINHOOD_RPC_URL` to `https://robinhood.drpc.org`.
+Robinhood public RPCs can vary by region. The frontend now prefers `https://robinhood.drpc.org` by default.
 
 For the current preview flow, these are also recommended:
 
