@@ -39,6 +39,17 @@ function readNumber(value: unknown): number | undefined {
   return undefined;
 }
 
+function readIsoTimestamp(value: string | undefined): bigint | undefined {
+  if (!value) return undefined;
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) return undefined;
+  return BigInt(Math.floor(ms / 1000));
+}
+
+function absBigint(value: bigint) {
+  return value < BigInt(0) ? -value : value;
+}
+
 function formatSupply(amount: bigint | undefined, decimals: number | undefined, symbol: string) {
   if (amount === undefined) return `— ${symbol}`;
   const value = Number(formatUnits(amount, decimals ?? 18));
@@ -76,12 +87,14 @@ function formatRelativeLaunch(timestamp: bigint | undefined, fallback: string, l
 }
 
 export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token: TokenDetail; chainKey: ChainKey }) {
+  const maxLaunchTimestampDrift = BigInt(7 * 24 * 60 * 60);
   const chain = getChainConfig(chainKey);
   const contracts = getEagleContracts(chainKey);
   const factoryAbi = getLaunchFactoryAbi(chainKey) as Abi;
   const publicClient = usePublicClient({ chainId: contracts.chainId });
   const [launchTimestamp, setLaunchTimestamp] = useState<bigint | undefined>();
   const [launchTxHash, setLaunchTxHash] = useState<string | undefined>();
+  const backendLaunchTimestamp = useMemo(() => readIsoTimestamp(token.launchedAt), [token.launchedAt]);
 
   const normalizedToken = isAddress(token.address) ? (token.address as Address) : undefined;
 
@@ -190,9 +203,11 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
           strict: false,
         }) as Array<{ args: Record<string, unknown>; transactionHash?: string }>;
         const matchingLog = launchLogs.find((event) => readAddress(event.args.token)?.toLowerCase() === normalizedToken.toLowerCase());
+        const timestampMatchesBackend =
+          !backendLaunchTimestamp || absBigint(block.timestamp - backendLaunchTimestamp) <= maxLaunchTimestampDrift;
         if (!cancelled) {
-          setLaunchTimestamp(block.timestamp);
-          setLaunchTxHash(matchingLog?.transactionHash);
+          setLaunchTimestamp(timestampMatchesBackend ? block.timestamp : undefined);
+          setLaunchTxHash(timestampMatchesBackend ? matchingLog?.transactionHash : undefined);
         }
       } catch {
         if (!cancelled) {
@@ -205,7 +220,7 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
     return () => {
       cancelled = true;
     };
-  }, [contracts.factory, factoryAbi, normalizedToken, onchainLaunchBlock, publicClient]);
+  }, [backendLaunchTimestamp, contracts.factory, factoryAbi, maxLaunchTimestampDrift, normalizedToken, onchainLaunchBlock, publicClient]);
 
   const symbol = tokenSymbolData ?? token.symbol;
   const quoteContract = onchainQuoteToken ?? getFallbackQuoteContract(token, chainKey);
@@ -233,8 +248,9 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
   });
   const displayName = tokenNameData ?? token.name;
   const quoteSymbol = liveMarket.quoteSymbol ?? quoteSymbolData ?? token.quoteSymbol;
-  const launchedAgo = formatRelativeLaunch(launchTimestamp, token.launchedAgo, lang);
-  const launchedDate = formatLaunchDate(launchTimestamp, lang, token.launchedDate);
+  const effectiveLaunchTimestamp = launchTimestamp ?? backendLaunchTimestamp;
+  const launchedAgo = formatRelativeLaunch(effectiveLaunchTimestamp, token.launchedAgo, lang);
+  const launchedDate = formatLaunchDate(effectiveLaunchTimestamp, lang, token.launchedDate);
   const pairLabel = `${symbol} / ${quoteSymbol}`;
   const totalSupply = formatSupply(tokenTotalSupplyData, tokenDecimalsData, symbol);
   const imageUrl = getTokenImageUrl(token.metadataURI);
