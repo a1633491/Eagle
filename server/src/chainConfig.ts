@@ -78,7 +78,7 @@ export const chainConfigs: Record<ChainKey, ServerChainConfig> = {
     factoryEnvKey: 'ROBINHOOD_FACTORY_ADDRESS',
     factoryStartBlockEnvKey: 'ROBINHOOD_FACTORY_START_BLOCK',
     supportsFactorySync: true,
-    defaultFactoryAddress: '0x45885Af25A1dF74f90B995A0aD1DF5623Ee22Ad7',
+    defaultFactoryAddress: '0xA1821b220716cE0bADb708Cd7A507D791f83437a',
     defaultRpcUrls: ['https://rpc.mainnet.chain.robinhood.com', 'https://robinhood.drpc.org'],
   },
 };

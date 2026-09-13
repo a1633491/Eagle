@@ -240,7 +240,7 @@ app.post('/api/swap/quote', async (c) => {
     const payload = await c.req.json<SwapQuoteRequest>();
     const chainKey = normalizeChainKey(payload.chainKey);
     if (chainKey !== 'robinhood') {
-      return c.json(fail('Only Robinhood Uni v4 quotes are enabled right now'));
+      return c.json(fail('Legacy Robinhood swap quotes are only enabled on Robinhood chain'));
     }
 
     if (!payload.swapper || !payload.tokenIn || !payload.tokenOut || !payload.amount) {
@@ -272,7 +272,7 @@ app.post('/api/swap/check-approval', async (c) => {
     const payload = await c.req.json<SwapQuoteRequest>();
     const chainKey = normalizeChainKey(payload.chainKey);
     if (chainKey !== 'robinhood') {
-      return c.json(fail('Only Robinhood Uni v4 approvals are enabled right now'));
+      return c.json(fail('Legacy Robinhood swap approvals are only enabled on Robinhood chain'));
     }
 
     if (!payload.swapper || !payload.tokenIn || !payload.amount) {

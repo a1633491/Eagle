@@ -1,6 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
 import { createClient, type RedisClientType } from 'redis';
-import { createPublicClient, getAddress, http, isAddress, parseAbiItem, zeroAddress } from 'viem';
+import { createPublicClient, getAddress, http, isAddress, parseAbiItem } from 'viem';
 import {
   getChainConfig,
   getConfiguredFactoryAddress,
@@ -27,12 +27,9 @@ const DEBUG_ENABLED = process.env.ENABLE_DEBUG_LOGS === '1';
 const v3TokenLaunchedEvent = parseAbiItem(
   'event TokenLaunched(address indexed token, address indexed creator, address indexed quoteToken, address pool, uint24 fee, int24 initialTick, uint256 totalSupply, uint256[] lockedPositionIds, string name, string symbol, string metadataURI)',
 );
-const robinhoodV4TokenLaunchedEvent = parseAbiItem(
-  'event TokenLaunched(address indexed token, address indexed creator, address indexed quoteToken, bytes32 poolId, uint24 fee, int24 tickSpacing, int24 initialTick, uint256 totalSupply, uint256[] lockedPositionIds, string name, string symbol, string metadataURI)',
-);
 
-function getTokenLaunchedEvent(chainKey: ChainKey) {
-  return chainKey === 'robinhood' ? robinhoodV4TokenLaunchedEvent : v3TokenLaunchedEvent;
+function getTokenLaunchedEvent(_chainKey: ChainKey) {
+  return v3TokenLaunchedEvent;
 }
 
 type TokenTrade = {
@@ -1410,7 +1407,7 @@ async function syncFactoryLaunchesInternal(chainKey: ChainKey, options?: { force
 
       for (const log of logs) {
         const args = log.args;
-        const poolAddress = chainKey === 'robinhood' ? zeroAddress : ('pool' in args ? args.pool : undefined);
+        const poolAddress = 'pool' in args ? args.pool : undefined;
         if (!args.token || !args.creator || !args.quoteToken || !poolAddress || !args.name || !args.symbol || args.totalSupply === undefined) {
           continue;
         }

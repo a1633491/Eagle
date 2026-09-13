@@ -80,6 +80,30 @@ This is useful for understanding the locker, but in the deployable Eagle archite
 - Creator share: remains in `claimableFees` and must be claimed manually
 - Holder distributor path: still works, because the distributor is just another creator fee recipient that calls `claimFees`
 
+## Robinhood Brew Quick Start
+
+Robinhood Chain can deploy the Brew launch suite on top of Uni v3. The deploy script still uses the legacy env names `PANCAKE_V3_FACTORY` and `PANCAKE_POSITION_MANAGER`, but on Robinhood they should point to the Uni v3 contracts below:
+
+- `ROBINHOOD_RPC_URL`
+- `ROBINHOODSCAN_API_KEY` (optional, for Blockscout verification)
+- `PANCAKE_V3_FACTORY=0x1f7d7550B1b028f7571E69A784071F0205FD2EfA`
+- `PANCAKE_POSITION_MANAGER=0x73991a25C818Bf1f1128dEAaB1492D45638DE0D3`
+- `WBNB=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73`
+
+The Robinhood-specific Brew scripts are:
+
+- `npm run deploy:robinhood`
+- `npm run verify:robinhood`
+
+Deployment output is written to `deployments/robinhood.json`.
+
+Current Robinhood Brew deployment:
+
+- `EagleFactory`: `0xA1821b220716cE0bADb708Cd7A507D791f83437a`
+- `EagleLiquidityLocker`: `0xf14Bc7e40Db50D5655957EFE87cB6f20d11AE872`
+- `EagleDistributorFactory`: `0xaE62EE1fb7Db56Db5ef7DeC817E573b3DDE0Af23`
+- Factory deployment block: `61867248`
+
 ## Robinhood v4 Quick Start
 
 For the Robinhood Chain Uni v4 launch suite, add these extra envs on top of the standard owner / treasury / deployer settings:

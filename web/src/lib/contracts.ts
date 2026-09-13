@@ -322,6 +322,6 @@ export const defaultLaunchConfig = {
   maxLaunchFeeWeiFallback: BigInt('10000000000000000'),
 } as const;
 
-export function getLaunchFactoryAbi(chainKey: ChainKey): Abi {
-  return chainKey === 'robinhood' ? robinhoodV4FactoryAbi : eagleFactoryAbi;
+export function getLaunchFactoryAbi(_chainKey: ChainKey): Abi {
+  return eagleFactoryAbi;
 }

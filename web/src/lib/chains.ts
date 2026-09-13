@@ -38,10 +38,11 @@ const baseLocker = (process.env.NEXT_PUBLIC_BASE_LOCKER_ADDRESS ??
 const baseDistributorFactory = (process.env.NEXT_PUBLIC_BASE_DISTRIBUTOR_FACTORY_ADDRESS ??
   '0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726') as Address;
 const robinhoodFactory = (process.env.NEXT_PUBLIC_ROBINHOOD_FACTORY_ADDRESS ??
-  '0x45885Af25A1dF74f90B995A0aD1DF5623Ee22Ad7') as Address;
+  '0xA1821b220716cE0bADb708Cd7A507D791f83437a') as Address;
 const robinhoodLocker = (process.env.NEXT_PUBLIC_ROBINHOOD_LOCKER_ADDRESS ??
-  '0x84BF96173F410F08Be868F53ACbE42B8d269e508') as Address;
-const robinhoodDistributorFactory = (process.env.NEXT_PUBLIC_ROBINHOOD_DISTRIBUTOR_FACTORY_ADDRESS ?? zeroAddress) as Address;
+  '0xf14Bc7e40Db50D5655957EFE87cB6f20d11AE872') as Address;
+const robinhoodDistributorFactory = (process.env.NEXT_PUBLIC_ROBINHOOD_DISTRIBUTOR_FACTORY_ADDRESS ??
+  '0xaE62EE1fb7Db56Db5ef7DeC817E573b3DDE0Af23') as Address;
 const robinhoodWrappedNativeToken =
   (process.env.NEXT_PUBLIC_ROBINHOOD_WETH_ADDRESS ?? '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73') as Address;
 const robinhoodStableToken =

@@ -80,7 +80,7 @@ const copy = {
     waitingLaunch: '等待钱包确认发射交易...',
     launchSuccess: '发射成功，正在跳转到代币详情页。',
     robinhoodWalletFeesOnly: 'Robinhood 当前仅支持钱包接收创作者费用。',
-    robinhoodFirstBuyDisabled: 'Robinhood Uni v4 发币暂不支持首购，首购金额必须为 0。',
+    robinhoodFirstBuyDisabled: 'Robinhood 首购参数无效，请检查授权、首购金额和最少收到数量。',
     failedPrefix: '交易失败：',
     customQuoteHint: '输入当前链上的任意标准代币地址。',
   },
@@ -113,7 +113,7 @@ const copy = {
     waitingLaunch: 'Waiting for wallet confirmation...',
     launchSuccess: 'Launch confirmed. Redirecting to token page.',
     robinhoodWalletFeesOnly: 'Robinhood currently supports wallet-based creator fees only.',
-    robinhoodFirstBuyDisabled: 'Robinhood Uni v4 launches do not support a first buy yet. Leave it at 0.',
+    robinhoodFirstBuyDisabled: 'Robinhood first-buy parameters are invalid. Check approval, the buy amount, and min tokens out.',
     failedPrefix: 'Transaction failed: ',
     customQuoteHint: 'Enter any standard token address on the selected chain.',
   },
@@ -146,7 +146,7 @@ const copy = {
     waitingLaunch: 'ウォレット確認を待っています...',
     launchSuccess: 'ローンチ完了。トークンページへ移動します。',
     robinhoodWalletFeesOnly: 'Robinhood では現在、クリエイター手数料の受取先はウォレットのみ対応です。',
-    robinhoodFirstBuyDisabled: 'Robinhood の Uni v4 ローンチでは初回購入は未対応です。0 のままにしてください。',
+    robinhoodFirstBuyDisabled: 'Robinhood の初回購入パラメータが無効です。承認、購入額、最少受取量を確認してください。',
     failedPrefix: '取引失敗: ',
     customQuoteHint: '選択中のチェーン上の標準トークンアドレスを入力してください。',
   },
@@ -394,7 +394,6 @@ export function LaunchSubmitActions({
   const locale = copy[lang];
   const chain = getChainConfig(chainKey);
   const contracts = getEagleContracts(chainKey);
-  const isRobinhoodChain = chainKey === 'robinhood';
   const factoryAbi = getLaunchFactoryAbi(chainKey) as Abi;
   const router = useRouter();
   const publicClient = usePublicClient({ chainId: contracts.chainId });
@@ -406,9 +405,7 @@ export function LaunchSubmitActions({
   const [salt] = useState(() => keccak256(stringToHex(`${Date.now()}-${Math.random()}`)));
   const [quoteUsdPrice, setQuoteUsdPrice] = useState<number>();
   const [quotePriceLoading, setQuotePriceLoading] = useState(false);
-  const supportsHolderDistributor =
-    !isRobinhoodChain &&
-    Boolean(contracts.distributorFactory && contracts.distributorFactory !== zeroAddress);
+  const supportsHolderDistributor = Boolean(contracts.distributorFactory && contracts.distributorFactory !== zeroAddress);
 
   const resolvedQuoteToken = useMemo<Address | undefined>(() => {
     if (pair === 'BNB') return contracts.wrappedNativeToken;
@@ -573,10 +570,8 @@ export function LaunchSubmitActions({
   const resolvedPredictedDistributorAddress = readAddress(predictedDistributorAddress);
 
   const holderFeeUnsupported = feeTarget === 'holders' && !supportsHolderDistributor;
-  const firstBuyUnsupported =
-    isRobinhoodChain &&
-    Boolean((firstBuyAmount && firstBuyAmount > BigInt(0)) || (parsedInitialBuyMinTokensOut && parsedInitialBuyMinTokensOut > BigInt(0)));
-  const needsApproval = !isRobinhoodChain && pair !== 'BNB' && Boolean(firstBuyAmount && firstBuyAmount > BigInt(0));
+  const firstBuyUnsupported = false;
+  const needsApproval = pair !== 'BNB' && Boolean(firstBuyAmount && firstBuyAmount > BigInt(0));
 
   const { data: currentAllowance, refetch: refetchAllowance } = useReadContract({
     chainId: contracts.chainId,
@@ -688,46 +683,25 @@ export function LaunchSubmitActions({
         setStatus(locale.loadingLaunchFee);
         return;
       }
-      const launchArgs = isRobinhoodChain
-        ? [
-            {
-              name: name.trim(),
-              symbol: ticker.trim(),
-              metadataURI: metadataUri,
-              totalSupply: parsedTotalSupply,
-              quoteToken: resolvedQuoteToken,
-              fee: feeTier,
-              tickSpacing,
-              initialTick: parsedInitialTick,
-              hooks: zeroAddress,
-              positions: [],
-              creatorFeeRecipient,
-              initialBuyQuoteAmount: BigInt(0),
-              initialBuyMinTokensOut: BigInt(0),
-              initialBuyRecipient: zeroAddress,
-              salt,
-              maxLaunchFeeWei: effectiveLaunchFee,
-            },
-          ]
-        : [
-            {
-              name: name.trim(),
-              symbol: ticker.trim(),
-              metadataURI: metadataUri,
-              totalSupply: parsedTotalSupply,
-              quoteToken: resolvedQuoteToken,
-              fee: feeTier,
-              initialTick: parsedInitialTick,
-              positions: [],
-              creatorFeeRecipient,
-              initialBuyQuoteAmount: firstBuyAmount,
-              initialBuyMinTokensOut: parsedInitialBuyMinTokensOut,
-              initialBuyRecipient: zeroAddress,
-              salt,
-              maxLaunchFeeWei: effectiveLaunchFee,
-            },
-          ];
-      const txValue = effectiveLaunchFee + (!isRobinhoodChain && pair === 'BNB' ? firstBuyAmount : BigInt(0));
+      const launchArgs = [
+        {
+          name: name.trim(),
+          symbol: ticker.trim(),
+          metadataURI: metadataUri,
+          totalSupply: parsedTotalSupply,
+          quoteToken: resolvedQuoteToken,
+          fee: feeTier,
+          initialTick: parsedInitialTick,
+          positions: [],
+          creatorFeeRecipient,
+          initialBuyQuoteAmount: firstBuyAmount,
+          initialBuyMinTokensOut: parsedInitialBuyMinTokensOut,
+          initialBuyRecipient: zeroAddress,
+          salt,
+          maxLaunchFeeWei: effectiveLaunchFee,
+        },
+      ];
+      const txValue = effectiveLaunchFee + (pair === 'BNB' ? firstBuyAmount : BigInt(0));
       const hash = await writeContractAsync({
         address: contracts.factory,
         abi: factoryAbi,
@@ -760,9 +734,7 @@ export function LaunchSubmitActions({
             functionName: 'launches',
             args: [launchedTokenAddress],
           })) as readonly unknown[];
-          const poolAddress = isRobinhoodChain
-            ? zeroAddress
-            : (readAddress(eventArgs?.pool) ?? readAddress(launchRecord?.[2]) ?? zeroAddress);
+          const poolAddress = readAddress(eventArgs?.pool) ?? readAddress(launchRecord?.[2]) ?? zeroAddress;
           const quoteToken = readAddress(eventArgs?.quoteToken) ?? readAddress(launchRecord?.[1]);
           if (poolAddress && quoteToken) {
             await registerLaunchedTokenWithRetry({

@@ -7,16 +7,19 @@
     "compile": "hardhat compile",
     "deploy:bsc": "hardhat run scripts/deploy.js --network bsc",
     "deploy:base": "hardhat run scripts/deploy.js --network base",
+    "deploy:robinhood": "hardhat run scripts/deploy.js --network robinhood",
     "deploy:robinhood-v4": "hardhat run scripts/deploy-robinhood-v4.js --network robinhood",
     "deploy:hardhat": "hardhat run scripts/deploy.js --network hardhat",
     "verify:bsc": "hardhat run scripts/verify.js --network bsc",
     "verify:base": "hardhat run scripts/verify.js --network base",
+    "verify:robinhood": "hardhat run scripts/verify.js --network robinhood",
     "verify:robinhood-v4": "hardhat run scripts/verify-robinhood-v4.js --network robinhood",
     "verify:robinhood-v4:sourcify": "hardhat run scripts/verify-robinhood-v4-sourcify.js --network robinhood",
     "verify:token:bsc": "hardhat run scripts/verify-token.js --network bsc",
     "verify:token:base": "hardhat run scripts/verify-token.js --network base",
     "set-launch-fee:bsc": "hardhat run scripts/set-launch-fee.js --network bsc",
-    "set-launch-fee:base": "hardhat run scripts/set-launch-fee.js --network base"
+    "set-launch-fee:base": "hardhat run scripts/set-launch-fee.js --network base",
+    "set-launch-fee:robinhood": "hardhat run scripts/set-launch-fee.js --network robinhood"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

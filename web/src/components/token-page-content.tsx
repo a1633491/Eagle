@@ -79,7 +79,6 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
   const chain = getChainConfig(chainKey);
   const contracts = getEagleContracts(chainKey);
   const factoryAbi = getLaunchFactoryAbi(chainKey) as Abi;
-  const isRobinhoodChain = chainKey === 'robinhood';
   const publicClient = usePublicClient({ chainId: contracts.chainId });
   const [launchTimestamp, setLaunchTimestamp] = useState<bigint | undefined>();
   const [launchTxHash, setLaunchTxHash] = useState<string | undefined>();
@@ -98,10 +97,10 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
   });
   const launchRecordTuple = launchRecord as readonly unknown[] | undefined;
   const onchainQuoteToken = readAddress(launchRecordTuple?.[1]);
-  const onchainPool = isRobinhoodChain ? undefined : readAddress(launchRecordTuple?.[2]);
-  const onchainCreator = isRobinhoodChain ? readAddress(launchRecordTuple?.[2]) : readAddress(launchRecordTuple?.[3]);
-  const onchainFeeTier = readNumber(launchRecordTuple?.[isRobinhoodChain ? 3 : 4]);
-  const onchainLaunchBlock = readBigint(launchRecordTuple?.[isRobinhoodChain ? 7 : 5]);
+  const onchainPool = readAddress(launchRecordTuple?.[2]);
+  const onchainCreator = readAddress(launchRecordTuple?.[3]);
+  const onchainFeeTier = readNumber(launchRecordTuple?.[4]);
+  const onchainLaunchBlock = readBigint(launchRecordTuple?.[5]);
 
   const { data: tokenSymbolData } = useReadContract({
     chainId: contracts.chainId,
@@ -342,8 +341,8 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
         <TokenMarketSections lang={lang} token={liveToken} />
       </section>
       <aside className='min-w-0 space-y-6'>
-        <SwapPanel lang={lang} token={liveToken} creatorClaimableText={creatorClaimableText} />
-        {chainKey !== 'robinhood' ? <TokenChainActions lang={lang} tokenAddress={token.address} chainKey={chainKey} /> : null}
+        {chainKey !== 'robinhood' ? <SwapPanel lang={lang} token={liveToken} creatorClaimableText={creatorClaimableText} /> : null}
+        <TokenChainActions lang={lang} tokenAddress={token.address} chainKey={chainKey} />
         <div className='rounded-[24px] border border-white/8 bg-[#1a1c19]/96 p-4 sm:p-5'>
           <h2 className='text-lg font-semibold text-[#f3f1e8]'>{t(lang, 'tokenDetails')}</h2>
           <div className='mt-4 divide-y divide-white/6 rounded-[18px] border border-white/8 bg-[#131512] text-sm text-[#a8ad99]'>

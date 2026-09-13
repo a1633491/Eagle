@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Globe, ImagePlus, Plus, Search, Triangle } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useReadContract } from 'wagmi';
 import { isAddress } from 'viem';
 import { LaunchSubmitActions } from '@/components/launch-submit-actions';
@@ -31,8 +31,6 @@ const copy = {
     creatorFees: '创作者费用',
     feeTargetHint: '选择让创作者费用由钱包领取，或流向持有人奖励。',
     firstPurchaseHint: '可在创建交易里用所选配对资产完成一笔可选首购。',
-    robinhoodFeeTargetHint: 'Robinhood 当前仅支持钱包接收创作者费用。',
-    robinhoodFirstPurchaseHint: 'Robinhood Uni v4 发币暂不支持首购，保持为 0 即可。',
     feeRecipientPlaceholder: '0x... 手续费接收钱包',
     yourTokenName: '你的代币名称',
     previewStory: '一个新想法，一个新社区，一切从这里开始。',
@@ -73,8 +71,6 @@ const copy = {
     creatorFees: 'Creator fees',
     feeTargetHint: 'Choose whether creator fees stay claimable by a wallet or route into holder rewards.',
     firstPurchaseHint: 'Add an optional buy in the launch transaction using your chosen pair.',
-    robinhoodFeeTargetHint: 'Robinhood currently supports wallet-based creator fees only.',
-    robinhoodFirstPurchaseHint: 'Robinhood Uni v4 launches do not support a first buy yet. Keep this at 0.',
     feeRecipientPlaceholder: '0x... fee recipient',
     yourTokenName: 'Your token name',
     previewStory: 'A new idea. A new community. It all starts here.',
@@ -115,8 +111,6 @@ const copy = {
     creatorFees: 'クリエイター手数料',
     feeTargetHint: 'クリエイター手数料をウォレットで受け取るか、保有者報酬に回すかを選択します。',
     firstPurchaseHint: '選択したペア資産で、ローンチ取引に任意の初回購入を追加できます。',
-    robinhoodFeeTargetHint: 'Robinhood では現在、クリエイター手数料の受取先はウォレットのみ対応です。',
-    robinhoodFirstPurchaseHint: 'Robinhood の Uni v4 ローンチでは初回購入は未対応です。0 のままにしてください。',
     feeRecipientPlaceholder: '0x... 手数料受取先',
     yourTokenName: 'あなたのトークン名',
     previewStory: '新しいアイデア。新しいコミュニティ。すべてはここから始まります。',
@@ -149,7 +143,6 @@ const copy = {
 
 export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainKey }) {
   const chain = getChainConfig(chainKey);
-  const isRobinhoodChain = chainKey === 'robinhood';
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState('');
   const [ticker, setTicker] = useState('');
@@ -208,16 +201,6 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
     subtitle: option.key === 'BNB' ? locale.native : option.key === 'USDT' ? locale.stable : option.subtitle,
   }));
   const chainMainnetLabel = `${chain.name} mainnet Chain ${chain.chainId}`;
-
-  useEffect(() => {
-    if (!isRobinhoodChain) return;
-    if (feeTarget !== 'wallet') {
-      setFeeTarget('wallet');
-    }
-    if (firstBuy !== '0' && firstBuy !== '0.00') {
-      setFirstBuy('0');
-    }
-  }, [feeTarget, firstBuy, isRobinhoodChain]);
 
   async function uploadImage(file: File) {
     const formData = new FormData();
@@ -555,19 +538,16 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
                   <button
                     type='button'
                     onClick={() => setFeeTarget('holders')}
-                    disabled={isRobinhoodChain}
                     className={`rounded-full px-3 py-2 text-sm transition ${
                       feeTarget === 'holders'
                         ? 'border border-[#e8d79f2f] bg-[#ffffff05] text-[#f1e4b7]'
                         : 'border border-white/8 bg-[#171916] text-[#a8ad99]'
-                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                    }`}
                   >
                     {locale.holders}
                   </button>
                 </div>
-                <p className='mt-3 text-xs leading-6 text-[#8f9482]'>
-                  {isRobinhoodChain ? locale.robinhoodFeeTargetHint : locale.feeTargetHint}
-                </p>
+                <p className='mt-3 text-xs leading-6 text-[#8f9482]'>{locale.feeTargetHint}</p>
               </div>
 
               <div className='rounded-[18px] border border-white/8 bg-[#111310] p-4'>
@@ -576,14 +556,11 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
                   <input
                     value={firstBuy}
                     onChange={(event) => setFirstBuy(event.target.value)}
-                    disabled={isRobinhoodChain}
                     className='w-full bg-transparent outline-none'
                   />
                   <span className='text-[#8f9482]'>{pairLabel}</span>
                 </div>
-                <p className='mt-3 text-xs leading-6 text-[#8f9482]'>
-                  {isRobinhoodChain ? locale.robinhoodFirstPurchaseHint : locale.firstPurchaseHint}
-                </p>
+                <p className='mt-3 text-xs leading-6 text-[#8f9482]'>{locale.firstPurchaseHint}</p>
               </div>
             </div>
 
