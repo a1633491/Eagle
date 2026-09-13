@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
+import { zeroAddress } from 'viem';
 import { currency, numberCompact, percent, shorten } from '@/lib/format';
 import { getTokenImageUrl } from '@/lib/token-image';
 import { TokenSummary } from '@/lib/types';
@@ -56,15 +57,19 @@ export function TokenTable({ tokens }: { tokens: TokenSummary[] }) {
               <td className="px-4 py-3">{currency(token.volume24h)}</td>
               <td className="px-4 py-3">{numberCompact(token.holders)}</td>
               <td className="px-4 py-3">
-                <a
-                  href={`https://bscscan.com/address/${token.poolAddress}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-[#a3a899] transition hover:text-[#f1e4b7]"
-                >
-                  {shorten(token.poolAddress)}
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                </a>
+                {token.poolAddress && token.poolAddress !== zeroAddress ? (
+                  <a
+                    href={`${token.explorerBaseUrl ?? 'https://bscscan.com'}/address/${token.poolAddress}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-[#a3a899] transition hover:text-[#f1e4b7]"
+                  >
+                    {shorten(token.poolAddress)}
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </a>
+                ) : (
+                  <span className="text-[#8f9482]">—</span>
+                )}
               </td>
             </tr>
           ))}

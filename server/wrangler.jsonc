@@ -8,6 +8,8 @@
 	],
         "vars": {
                 "ROBINHOOD_RPC_URL": "https://rpc.mainnet.chain.robinhood.com",
+                "ROBINHOOD_FACTORY_ADDRESS": "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE",
+                "ROBINHOOD_FACTORY_START_BLOCK": "61540268",
                 "ROBINHOOD_WETH_ADDRESS": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
                 "ROBINHOOD_STABLE_TOKEN_ADDRESS": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
                 "ROBINHOOD_STABLE_SYMBOL": "USDG",

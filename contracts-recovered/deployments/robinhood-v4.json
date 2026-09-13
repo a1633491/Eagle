@@ -1,0 +1,37 @@
+{
+  "network": "robinhood",
+  "chainId": "4663",
+  "deployer": "0xd25163E144592c695D49EC6b5E3a9C723B9a1972",
+  "uniswapV4PoolManager": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+  "uniswapV4PositionManager": "0x58daec3116aae6D93017bAAea7749052E8a04fA7",
+  "wrappedNative": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+  "owner": "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
+  "treasury": "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
+  "launchFeeWei": "10000000000000000",
+  "protocolLpFeeBps": 5000,
+  "robinhoodV4Factory": "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE",
+  "robinhoodV4LiquidityLocker": "0x01ec131cF83F2978780D969b79f4839090618187",
+  "verification": {
+    "robinhoodV4Factory": {
+      "address": "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE",
+      "contract": "contracts/RobinhoodUniV4LaunchSuite.sol:RobinhoodV4Factory",
+      "constructorArguments": [
+        "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+        "0x58daec3116aae6D93017bAAea7749052E8a04fA7",
+        "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+        "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
+        "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
+        "10000000000000000",
+        5000
+      ]
+    },
+    "robinhoodV4LiquidityLocker": {
+      "address": "0x01ec131cF83F2978780D969b79f4839090618187",
+      "contract": "contracts/RobinhoodUniV4LaunchSuite.sol:RobinhoodV4LiquidityLocker",
+      "constructorArguments": [
+        "0x58daec3116aae6D93017bAAea7749052E8a04fA7",
+        "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE"
+      ]
+    }
+  }
+}

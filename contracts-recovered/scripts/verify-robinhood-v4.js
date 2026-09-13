@@ -16,27 +16,19 @@ async function verify(entry, label) {
       console.log(`Already verified ${label}: ${entry.address}`);
       return;
     }
-    if (message.includes('Missing chainid parameter (required for v2 api)')) {
-      console.log(
-        `Verification submitted for ${label}: ${entry.address}. Explorer polling hit the Etherscan v2 chainid issue, so please confirm on the explorer page.`,
-      );
-      return;
-    }
     throw error;
   }
 }
 
 async function main() {
-  const deploymentFile = path.join(process.cwd(), 'deployments', `${hre.network.name}.json`);
+  const deploymentFile = path.join(process.cwd(), 'deployments', `${hre.network.name}-v4.json`);
   if (!fs.existsSync(deploymentFile)) {
     throw new Error(`Deployment file not found: ${deploymentFile}`);
   }
 
   const deployment = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
-
-  await verify(deployment.verification.eagleFactory, 'EagleFactory');
-  await verify(deployment.verification.eagleLiquidityLocker, 'EagleLiquidityLocker');
-  await verify(deployment.verification.eagleDistributorFactory, 'EagleDistributorFactory');
+  await verify(deployment.verification.robinhoodV4Factory, 'RobinhoodV4Factory');
+  await verify(deployment.verification.robinhoodV4LiquidityLocker, 'RobinhoodV4LiquidityLocker');
 }
 
 main().catch((error) => {

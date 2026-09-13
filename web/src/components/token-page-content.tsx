@@ -3,13 +3,13 @@
 import { ArrowUpRight } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { usePublicClient, useReadContract } from 'wagmi';
-import { type Address, formatUnits, isAddress, zeroAddress } from 'viem';
+import { type Abi, type Address, formatUnits, isAddress, parseEventLogs, zeroAddress } from 'viem';
 import { SwapPanel } from '@/components/swap-panel';
 import { TokenChainActions } from '@/components/token-chain-actions';
 import { TokenMarketSections } from '@/components/token-market-sections';
 import { getChainConfig, type ChainKey } from '@/lib/chains';
 import { currency, percent, shorten } from '@/lib/format';
-import { eagleErc20Abi, eagleFactoryAbi, eagleLiquidityLockerAbi, getEagleContracts } from '@/lib/contracts';
+import { eagleErc20Abi, eagleLiquidityLockerAbi, getEagleContracts, getLaunchFactoryAbi } from '@/lib/contracts';
 import { t, type Lang } from '@/lib/i18n';
 import { getTokenImageUrl } from '@/lib/token-image';
 import { type TokenDetail } from '@/lib/types';
@@ -21,6 +21,22 @@ function getFallbackQuoteContract(token: TokenDetail, chainKey: ChainKey) {
   if (token.quoteSymbol === chain.wrappedNativeSymbol) return contracts.wrappedNativeToken;
   if (token.quoteSymbol === chain.stableSymbol) return contracts.stableToken;
   return token.poolAddress as Address;
+}
+
+function readAddress(value: unknown): Address | undefined {
+  return typeof value === 'string' && isAddress(value) ? (value as Address) : undefined;
+}
+
+function readBigint(value: unknown): bigint | undefined {
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return BigInt(value);
+  return undefined;
+}
+
+function readNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'bigint') return Number(value);
+  return undefined;
 }
 
 function formatSupply(amount: bigint | undefined, decimals: number | undefined, symbol: string) {
@@ -62,6 +78,8 @@ function formatRelativeLaunch(timestamp: bigint | undefined, fallback: string, l
 export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token: TokenDetail; chainKey: ChainKey }) {
   const chain = getChainConfig(chainKey);
   const contracts = getEagleContracts(chainKey);
+  const factoryAbi = getLaunchFactoryAbi(chainKey) as Abi;
+  const isRobinhoodChain = chainKey === 'robinhood';
   const publicClient = usePublicClient();
   const [launchTimestamp, setLaunchTimestamp] = useState<bigint | undefined>();
   const [launchTxHash, setLaunchTxHash] = useState<string | undefined>();
@@ -70,19 +88,19 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
 
   const { data: launchRecord } = useReadContract({
     address: contracts.factory,
-    abi: eagleFactoryAbi,
+    abi: factoryAbi,
     functionName: 'launches',
     args: normalizedToken ? [normalizedToken] : undefined,
     query: {
       enabled: Boolean(normalizedToken && contracts.factory),
     },
   });
-
-  const onchainQuoteToken = launchRecord?.[1];
-  const onchainPool = launchRecord?.[2];
-  const onchainCreator = launchRecord?.[3];
-  const onchainFeeTier = launchRecord?.[4];
-  const onchainLaunchBlock = launchRecord?.[5];
+  const launchRecordTuple = launchRecord as readonly unknown[] | undefined;
+  const onchainQuoteToken = readAddress(launchRecordTuple?.[1]);
+  const onchainPool = isRobinhoodChain ? undefined : readAddress(launchRecordTuple?.[2]);
+  const onchainCreator = isRobinhoodChain ? readAddress(launchRecordTuple?.[2]) : readAddress(launchRecordTuple?.[3]);
+  const onchainFeeTier = readNumber(launchRecordTuple?.[isRobinhoodChain ? 3 : 4]);
+  const onchainLaunchBlock = readBigint(launchRecordTuple?.[isRobinhoodChain ? 7 : 5]);
 
   const { data: tokenSymbolData } = useReadContract({
     address: normalizedToken,
@@ -155,15 +173,20 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
           publicClient.getBlock({ blockNumber: onchainLaunchBlock }),
           publicClient.getLogs({
             address: contracts.factory,
-            event: eagleFactoryAbi[0],
-            args: { token: normalizedToken },
             fromBlock: onchainLaunchBlock,
             toBlock: onchainLaunchBlock,
           }),
         ]);
+        const launchLogs = parseEventLogs({
+          abi: factoryAbi,
+          eventName: 'TokenLaunched',
+          logs,
+          strict: false,
+        }) as Array<{ args: Record<string, unknown>; transactionHash?: string }>;
+        const matchingLog = launchLogs.find((event) => readAddress(event.args.token)?.toLowerCase() === normalizedToken.toLowerCase());
         if (!cancelled) {
           setLaunchTimestamp(block.timestamp);
-          setLaunchTxHash(logs[0]?.transactionHash);
+          setLaunchTxHash(matchingLog?.transactionHash);
         }
       } catch {
         if (!cancelled) {
@@ -176,7 +199,7 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
     return () => {
       cancelled = true;
     };
-  }, [contracts.factory, normalizedToken, onchainLaunchBlock, publicClient]);
+  }, [contracts.factory, factoryAbi, normalizedToken, onchainLaunchBlock, publicClient]);
 
   const symbol = tokenSymbolData ?? token.symbol;
   const quoteContract = onchainQuoteToken ?? getFallbackQuoteContract(token, chainKey);
@@ -318,7 +341,11 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
           <div className='mt-4 divide-y divide-white/6 rounded-[18px] border border-white/8 bg-[#131512] text-sm text-[#a8ad99]'>
             <DetailRow label={t(lang, 'tradingPair')} value={pairLabel} />
             <DetailLink label={t(lang, 'quoteContract')} href={`${chain.explorerBaseUrl}/token/${quoteContract}`} value={shorten(quoteContract)} />
-            <DetailLink label={t(lang, 'pool')} href={`${chain.explorerBaseUrl}/address/${poolAddress}`} value={shorten(poolAddress)} />
+            {poolAddress && poolAddress !== zeroAddress ? (
+              <DetailLink label={t(lang, 'pool')} href={`${chain.explorerBaseUrl}/address/${poolAddress}`} value={shorten(poolAddress)} />
+            ) : (
+              <DetailRow label={t(lang, 'pool')} value='—' />
+            )}
             <DetailLink label={t(lang, 'creator')} href={`${chain.explorerBaseUrl}/address/${creatorAddress}`} value={shorten(creatorAddress)} />
             <DetailRow label={t(lang, 'totalSupply')} value={totalSupply} />
             <DetailRow label={t(lang, 'launched')} value={launchedDate} />

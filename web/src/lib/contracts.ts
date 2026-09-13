@@ -1,4 +1,4 @@
-import { type Address, erc20Abi } from 'viem';
+import { type Abi, type Address, erc20Abi } from 'viem';
 import { getChainConfig, type ChainKey } from '@/lib/chains';
 
 export type EagleContracts = {
@@ -129,6 +129,116 @@ export const eagleFactoryAbi = [
   },
 ] as const;
 
+export const robinhoodV4FactoryAbi = [
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'address', name: 'token', type: 'address' },
+      { indexed: true, internalType: 'address', name: 'creator', type: 'address' },
+      { indexed: true, internalType: 'address', name: 'quoteToken', type: 'address' },
+      { indexed: false, internalType: 'bytes32', name: 'poolId', type: 'bytes32' },
+      { indexed: false, internalType: 'uint24', name: 'fee', type: 'uint24' },
+      { indexed: false, internalType: 'int24', name: 'tickSpacing', type: 'int24' },
+      { indexed: false, internalType: 'int24', name: 'initialTick', type: 'int24' },
+      { indexed: false, internalType: 'uint256', name: 'totalSupply', type: 'uint256' },
+      { indexed: false, internalType: 'uint256[]', name: 'lockedPositionIds', type: 'uint256[]' },
+      { indexed: false, internalType: 'string', name: 'name', type: 'string' },
+      { indexed: false, internalType: 'string', name: 'symbol', type: 'string' },
+      { indexed: false, internalType: 'string', name: 'metadataURI', type: 'string' },
+    ],
+    name: 'TokenLaunched',
+    type: 'event',
+  },
+  {
+    inputs: [],
+    name: 'launchFeeWei',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'locker',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'address', name: 'token', type: 'address' }],
+    name: 'launches',
+    outputs: [
+      { internalType: 'address', name: 'token', type: 'address' },
+      { internalType: 'address', name: 'quoteToken', type: 'address' },
+      { internalType: 'address', name: 'creator', type: 'address' },
+      { internalType: 'uint24', name: 'fee', type: 'uint24' },
+      { internalType: 'int24', name: 'tickSpacing', type: 'int24' },
+      { internalType: 'address', name: 'hooks', type: 'address' },
+      { internalType: 'bytes32', name: 'poolId', type: 'bytes32' },
+      { internalType: 'uint64', name: 'launchedAtBlock', type: 'uint64' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'address', name: 'creator', type: 'address' },
+      { internalType: 'bytes32', name: 'salt', type: 'bytes32' },
+      { internalType: 'string', name: 'name', type: 'string' },
+      { internalType: 'string', name: 'symbol', type: 'string' },
+      { internalType: 'uint256', name: 'totalSupply', type: 'uint256' },
+      { internalType: 'string', name: 'metadataURI', type: 'string' },
+    ],
+    name: 'predictTokenAddress',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        components: [
+          { internalType: 'string', name: 'name', type: 'string' },
+          { internalType: 'string', name: 'symbol', type: 'string' },
+          { internalType: 'string', name: 'metadataURI', type: 'string' },
+          { internalType: 'uint256', name: 'totalSupply', type: 'uint256' },
+          { internalType: 'address', name: 'quoteToken', type: 'address' },
+          { internalType: 'uint24', name: 'fee', type: 'uint24' },
+          { internalType: 'int24', name: 'tickSpacing', type: 'int24' },
+          { internalType: 'int24', name: 'initialTick', type: 'int24' },
+          { internalType: 'address', name: 'hooks', type: 'address' },
+          {
+            components: [
+              { internalType: 'int24', name: 'tickLower', type: 'int24' },
+              { internalType: 'int24', name: 'tickUpper', type: 'int24' },
+              { internalType: 'uint16', name: 'bps', type: 'uint16' },
+            ],
+            internalType: 'struct RobinhoodV4Factory.LiquidityPosition[]',
+            name: 'positions',
+            type: 'tuple[]',
+          },
+          { internalType: 'address', name: 'creatorFeeRecipient', type: 'address' },
+          { internalType: 'uint256', name: 'initialBuyQuoteAmount', type: 'uint256' },
+          { internalType: 'uint256', name: 'initialBuyMinTokensOut', type: 'uint256' },
+          { internalType: 'address', name: 'initialBuyRecipient', type: 'address' },
+          { internalType: 'bytes32', name: 'salt', type: 'bytes32' },
+          { internalType: 'uint256', name: 'maxLaunchFeeWei', type: 'uint256' },
+        ],
+        internalType: 'struct RobinhoodV4Factory.LaunchParams',
+        name: 'params',
+        type: 'tuple',
+      },
+    ],
+    name: 'launch',
+    outputs: [
+      { internalType: 'address', name: 'token', type: 'address' },
+      { internalType: 'bytes32', name: 'poolId', type: 'bytes32' },
+      { internalType: 'uint256[]', name: 'positionIds', type: 'uint256[]' },
+    ],
+    stateMutability: 'payable',
+    type: 'function',
+  },
+] as const;
+
 export const eagleLiquidityLockerAbi = [
   {
     inputs: [
@@ -211,3 +321,7 @@ export const defaultLaunchConfig = {
   initialBuyMinTokensOut: BigInt(0),
   maxLaunchFeeWeiFallback: BigInt('10000000000000000'),
 } as const;
+
+export function getLaunchFactoryAbi(chainKey: ChainKey): Abi {
+  return chainKey === 'robinhood' ? robinhoodV4FactoryAbi : eagleFactoryAbi;
+}

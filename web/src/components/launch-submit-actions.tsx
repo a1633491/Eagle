@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useAccount, usePublicClient, useReadContract, useSwitchChain, useWriteContract } from 'wagmi';
 import {
+  type Abi,
   type Address,
   formatEther,
   formatUnits,
@@ -18,7 +19,7 @@ import {
   defaultLaunchConfig,
   eagleDistributorFactoryAbi,
   eagleErc20Abi,
-  eagleFactoryAbi,
+  getLaunchFactoryAbi,
   getEagleContracts,
   tickSpacingByFeeTier,
 } from '@/lib/contracts';
@@ -75,7 +76,8 @@ const copy = {
     approvalSuccess: '授权成功，现在可以发射。',
     waitingLaunch: '等待钱包确认发射交易...',
     launchSuccess: '发射成功，正在跳转到代币详情页。',
-    robinhoodLaunchSoon: 'Robinhood 发币将走 Uni v4，当前还在接入中。',
+    robinhoodWalletFeesOnly: 'Robinhood 当前仅支持钱包接收创作者费用。',
+    robinhoodFirstBuyDisabled: 'Robinhood Uni v4 发币暂不支持首购，首购金额必须为 0。',
     failedPrefix: '交易失败：',
     customQuoteHint: '输入当前链上的任意标准代币地址。',
   },
@@ -104,7 +106,8 @@ const copy = {
     approvalSuccess: 'Approval confirmed. You can launch now.',
     waitingLaunch: 'Waiting for wallet confirmation...',
     launchSuccess: 'Launch confirmed. Redirecting to token page.',
-    robinhoodLaunchSoon: 'Robinhood launches will use Uni v4 and are still being integrated.',
+    robinhoodWalletFeesOnly: 'Robinhood currently supports wallet-based creator fees only.',
+    robinhoodFirstBuyDisabled: 'Robinhood Uni v4 launches do not support a first buy yet. Leave it at 0.',
     failedPrefix: 'Transaction failed: ',
     customQuoteHint: 'Enter any standard token address on the selected chain.',
   },
@@ -133,7 +136,8 @@ const copy = {
     approvalSuccess: '承認完了。ローンチできます。',
     waitingLaunch: 'ウォレット確認を待っています...',
     launchSuccess: 'ローンチ完了。トークンページへ移動します。',
-    robinhoodLaunchSoon: 'Robinhood のローンチは Uni v4 で実装中です。',
+    robinhoodWalletFeesOnly: 'Robinhood では現在、クリエイター手数料の受取先はウォレットのみ対応です。',
+    robinhoodFirstBuyDisabled: 'Robinhood の Uni v4 ローンチでは初回購入は未対応です。0 のままにしてください。',
     failedPrefix: '取引失敗: ',
     customQuoteHint: '選択中のチェーン上の標準トークンアドレスを入力してください。',
   },
@@ -144,6 +148,22 @@ function normalizeError(error: unknown, prefix: string) {
     return `${prefix}${error.message}`;
   }
   return `${prefix}Unknown error`;
+}
+
+function readAddress(value: unknown): Address | undefined {
+  return typeof value === 'string' && isAddress(value) ? (value as Address) : undefined;
+}
+
+function readNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'bigint') return Number(value);
+  return undefined;
+}
+
+function readBigint(value: unknown): bigint | undefined {
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return BigInt(value);
+  return undefined;
 }
 
 async function fetchQuoteUsdPrice(token: Address, chainKey: ChainKey) {
@@ -314,7 +334,8 @@ export function LaunchSubmitActions({
   const locale = copy[lang];
   const chain = getChainConfig(chainKey);
   const contracts = getEagleContracts(chainKey);
-  const isRobinhoodPreview = chainKey === 'robinhood';
+  const isRobinhoodChain = chainKey === 'robinhood';
+  const factoryAbi = getLaunchFactoryAbi(chainKey) as Abi;
   const router = useRouter();
   const publicClient = usePublicClient();
   const { address, isConnected, chainId: walletChainId } = useAccount();
@@ -325,6 +346,9 @@ export function LaunchSubmitActions({
   const [salt] = useState(() => keccak256(stringToHex(`${Date.now()}-${Math.random()}`)));
   const [quoteUsdPrice, setQuoteUsdPrice] = useState<number>();
   const [quotePriceLoading, setQuotePriceLoading] = useState(false);
+  const supportsHolderDistributor =
+    !isRobinhoodChain &&
+    Boolean(contracts.distributorFactory && contracts.distributorFactory !== zeroAddress);
 
   const resolvedQuoteToken = useMemo<Address | undefined>(() => {
     if (pair === 'BNB') return contracts.wrappedNativeToken;
@@ -334,12 +358,13 @@ export function LaunchSubmitActions({
 
   const { data: launchFeeWei } = useReadContract({
     address: contracts.factory,
-    abi: eagleFactoryAbi,
+    abi: factoryAbi,
     functionName: 'launchFeeWei',
     query: {
       enabled: Boolean(contracts.factory),
     },
   });
+  const resolvedLaunchFeeWei = readBigint(launchFeeWei) ?? defaultLaunchConfig.maxLaunchFeeWeiFallback;
 
   const { data: customQuoteDecimals } = useReadContract({
     address: resolvedQuoteToken,
@@ -451,7 +476,7 @@ export function LaunchSubmitActions({
 
   const { data: predictedTokenAddress } = useReadContract({
     address: contracts.factory,
-    abi: eagleFactoryAbi,
+    abi: factoryAbi,
     functionName: 'predictTokenAddress',
     args: readyForPrediction
       ? [
@@ -472,13 +497,19 @@ export function LaunchSubmitActions({
     address: contracts.distributorFactory,
     abi: eagleDistributorFactoryAbi,
     functionName: 'predict',
-    args: predictedTokenAddress ? [predictedTokenAddress] : undefined,
+    args: readAddress(predictedTokenAddress) ? [readAddress(predictedTokenAddress)!] : undefined,
     query: {
-      enabled: Boolean(predictedTokenAddress && contracts.distributorFactory),
+      enabled: Boolean(predictedTokenAddress && supportsHolderDistributor && contracts.distributorFactory),
     },
   });
+  const resolvedPredictedTokenAddress = readAddress(predictedTokenAddress);
+  const resolvedPredictedDistributorAddress = readAddress(predictedDistributorAddress);
 
-  const needsApproval = pair !== 'BNB' && Boolean(firstBuyAmount && firstBuyAmount > BigInt(0));
+  const holderFeeUnsupported = feeTarget === 'holders' && !supportsHolderDistributor;
+  const firstBuyUnsupported =
+    isRobinhoodChain &&
+    Boolean((firstBuyAmount && firstBuyAmount > BigInt(0)) || (parsedInitialBuyMinTokensOut && parsedInitialBuyMinTokensOut > BigInt(0)));
+  const needsApproval = !isRobinhoodChain && pair !== 'BNB' && Boolean(firstBuyAmount && firstBuyAmount > BigInt(0));
 
   const { data: currentAllowance, refetch: refetchAllowance } = useReadContract({
     address: resolvedQuoteToken,
@@ -489,27 +520,26 @@ export function LaunchSubmitActions({
       enabled: Boolean(address && resolvedQuoteToken && needsApproval && contracts.factory),
     },
   });
-
-  const approvalSatisfied = !needsApproval || Boolean(currentAllowance && firstBuyAmount !== undefined && currentAllowance >= firstBuyAmount);
+  const resolvedCurrentAllowance = readBigint(currentAllowance);
+  const approvalSatisfied =
+    !needsApproval || Boolean(resolvedCurrentAllowance && firstBuyAmount !== undefined && resolvedCurrentAllowance >= firstBuyAmount);
 
   const creatorFeeRecipient = useMemo<Address>(() => {
     if (feeTarget === 'holders') {
-      return predictedDistributorAddress ?? zeroAddress;
+      return resolvedPredictedDistributorAddress ?? zeroAddress;
     }
     if (isAddress(feeWallet)) {
       return feeWallet as Address;
     }
     return zeroAddress;
-  }, [feeTarget, feeWallet, predictedDistributorAddress]);
+  }, [feeTarget, feeWallet, resolvedPredictedDistributorAddress]);
 
   const isWrongNetwork = isConnected && walletChainId !== undefined && walletChainId !== chain.chainId;
 
   const formReady =
     isConnected &&
-    !isRobinhoodPreview &&
     Boolean(address) &&
     Boolean(contracts.factory) &&
-    Boolean(contracts.distributorFactory) &&
     Boolean(name.trim()) &&
     Boolean(ticker.trim()) &&
     Boolean(resolvedQuoteToken) &&
@@ -519,8 +549,10 @@ export function LaunchSubmitActions({
     parsedInitialBuyMinTokensOut !== undefined &&
     !imageUploading &&
     !quotePriceLoading &&
+    !holderFeeUnsupported &&
+    !firstBuyUnsupported &&
     tickAligned &&
-    (feeTarget !== 'holders' || Boolean(predictedDistributorAddress));
+      (feeTarget !== 'holders' || Boolean(resolvedPredictedDistributorAddress));
 
   const canLaunch = formReady && approvalSatisfied && !isWrongNetwork;
   const canApprove = formReady && needsApproval && !approvalSatisfied && !isWrongNetwork;
@@ -580,78 +612,96 @@ export function LaunchSubmitActions({
     try {
       setIsBusy(true);
       setStatus(locale.waitingLaunch);
-      const effectiveLaunchFee = launchFeeWei ?? defaultLaunchConfig.maxLaunchFeeWeiFallback;
+        const effectiveLaunchFee = resolvedLaunchFeeWei;
+      const launchArgs = isRobinhoodChain
+        ? [
+            {
+              name: name.trim(),
+              symbol: ticker.trim(),
+              metadataURI: metadataUri,
+              totalSupply: parsedTotalSupply,
+              quoteToken: resolvedQuoteToken,
+              fee: feeTier,
+              tickSpacing,
+              initialTick: parsedInitialTick,
+              hooks: zeroAddress,
+              positions: [],
+              creatorFeeRecipient,
+              initialBuyQuoteAmount: BigInt(0),
+              initialBuyMinTokensOut: BigInt(0),
+              initialBuyRecipient: zeroAddress,
+              salt,
+              maxLaunchFeeWei: effectiveLaunchFee,
+            },
+          ]
+        : [
+            {
+              name: name.trim(),
+              symbol: ticker.trim(),
+              metadataURI: metadataUri,
+              totalSupply: parsedTotalSupply,
+              quoteToken: resolvedQuoteToken,
+              fee: feeTier,
+              initialTick: parsedInitialTick,
+              positions: [],
+              creatorFeeRecipient,
+              initialBuyQuoteAmount: firstBuyAmount,
+              initialBuyMinTokensOut: parsedInitialBuyMinTokensOut,
+              initialBuyRecipient: zeroAddress,
+              salt,
+              maxLaunchFeeWei: effectiveLaunchFee,
+            },
+          ];
       const hash = await writeContractAsync({
         address: contracts.factory,
-        abi: eagleFactoryAbi,
+        abi: factoryAbi,
         functionName: 'launch',
-        args: [
-          {
-            name: name.trim(),
-            symbol: ticker.trim(),
-            metadataURI: metadataUri,
-            totalSupply: parsedTotalSupply,
-            quoteToken: resolvedQuoteToken,
-            fee: feeTier,
-            initialTick: parsedInitialTick,
-            positions: [],
-            creatorFeeRecipient,
-            initialBuyQuoteAmount: firstBuyAmount,
-            initialBuyMinTokensOut: parsedInitialBuyMinTokensOut,
-            initialBuyRecipient: zeroAddress,
-            salt,
-            maxLaunchFeeWei: effectiveLaunchFee,
-          },
-        ],
-        value: effectiveLaunchFee + (pair === 'BNB' ? firstBuyAmount : BigInt(0)),
+        args: launchArgs,
+        value: effectiveLaunchFee + (!isRobinhoodChain && pair === 'BNB' ? firstBuyAmount : BigInt(0)),
       });
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
-      const launchEvents = parseEventLogs({
-        abi: eagleFactoryAbi,
+        const launchEvents = parseEventLogs({
+        abi: factoryAbi,
         eventName: 'TokenLaunched',
         logs: receipt.logs,
         strict: false,
-      });
+        }) as Array<{ args: Record<string, unknown> }>;
       const matchedLaunchEvent =
         launchEvents.find((event) =>
-          predictedTokenAddress ? event.args.token?.toLowerCase() === predictedTokenAddress.toLowerCase() : true,
+            resolvedPredictedTokenAddress
+              ? typeof event.args.token === 'string' && event.args.token.toLowerCase() === resolvedPredictedTokenAddress.toLowerCase()
+              : true,
         ) ?? launchEvents[0];
-      const launchedTokenAddress = matchedLaunchEvent?.args.token ?? predictedTokenAddress;
+        const eventArgs = matchedLaunchEvent?.args;
+        const launchedTokenAddress = readAddress(eventArgs?.token) ?? resolvedPredictedTokenAddress;
 
       if (launchedTokenAddress) {
         try {
           const block = await publicClient.getBlock({ blockNumber: receipt.blockNumber });
-          const poolAddress =
-            matchedLaunchEvent?.args.pool ??
-            (await publicClient.readContract({
+          const launchRecord = (await publicClient.readContract({
               address: contracts.factory,
-              abi: eagleFactoryAbi,
+              abi: factoryAbi,
               functionName: 'launches',
               args: [launchedTokenAddress],
-            }).then((launchRecord) => launchRecord[2]));
-          const quoteToken =
-            matchedLaunchEvent?.args.quoteToken ??
-            (await publicClient.readContract({
-              address: contracts.factory,
-              abi: eagleFactoryAbi,
-              functionName: 'launches',
-              args: [launchedTokenAddress],
-            }).then((launchRecord) => launchRecord[1]));
+            })) as readonly unknown[];
+          const poolAddress = isRobinhoodChain
+            ? zeroAddress
+              : (readAddress(eventArgs?.pool) ?? readAddress(launchRecord?.[2]) ?? zeroAddress);
+            const quoteToken = readAddress(eventArgs?.quoteToken) ?? readAddress(launchRecord?.[1]);
           if (poolAddress && quoteToken) {
             await registerLaunchedTokenWithRetry({
               chainKey,
               address: launchedTokenAddress,
-              name: typeof matchedLaunchEvent?.args.name === 'string' ? matchedLaunchEvent.args.name : name.trim(),
-              symbol: typeof matchedLaunchEvent?.args.symbol === 'string' ? matchedLaunchEvent.args.symbol : ticker.trim(),
+                name: typeof eventArgs?.name === 'string' ? eventArgs.name : name.trim(),
+                symbol: typeof eventArgs?.symbol === 'string' ? eventArgs.symbol : ticker.trim(),
               description: story.trim(),
               creator: address as Address,
               poolAddress,
               quoteToken,
               quoteSymbol: resolvedQuoteSymbol,
               totalSupply: parsedTotalSupply,
-              metadataURI:
-                typeof matchedLaunchEvent?.args.metadataURI === 'string' ? matchedLaunchEvent.args.metadataURI : metadataUri,
-              feeTier: typeof matchedLaunchEvent?.args.fee === 'number' ? matchedLaunchEvent.args.fee : feeTier,
+                metadataURI: typeof eventArgs?.metadataURI === 'string' ? eventArgs.metadataURI : metadataUri,
+                feeTier: readNumber(eventArgs?.fee) ?? feeTier,
               launchedAt: new Date(Number(block.timestamp) * 1000).toISOString(),
             });
           }
@@ -685,16 +735,14 @@ export function LaunchSubmitActions({
 
   const primaryLabel = !isConnected
     ? locale.connectWallet
-    : isRobinhoodPreview
-      ? 'Uni v4 Soon'
     : isWrongNetwork
       ? `${locale.switchNetwork} ${chain.name}`
     : !approvalSatisfied
       ? locale.approveFirstBuy
       : locale.launchNow;
 
-  const primaryAction = isRobinhoodPreview ? (() => undefined) : isWrongNetwork ? handleSwitchNetwork : approvalSatisfied ? handleLaunch : handleApprove;
-  const launchFeeText = formatEther(launchFeeWei ?? defaultLaunchConfig.maxLaunchFeeWeiFallback);
+  const primaryAction = isWrongNetwork ? handleSwitchNetwork : approvalSatisfied ? handleLaunch : handleApprove;
+    const launchFeeText = formatEther(resolvedLaunchFeeWei);
   const firstBuyText = firstBuyAmount !== undefined ? formatUnits(firstBuyAmount, quoteDecimals) : '0';
 
   return (
@@ -720,22 +768,24 @@ export function LaunchSubmitActions({
         </div>
         <div className='flex items-center justify-between gap-4'>
           <span className='text-[#8f9482]'>{locale.predictedToken}</span>
-          <span className='max-w-[60%] truncate text-right text-[#f3f1e8]'>{predictedTokenAddress ?? '—'}</span>
+            <span className='max-w-[60%] truncate text-right text-[#f3f1e8]'>{resolvedPredictedTokenAddress ?? '—'}</span>
         </div>
         {feeTarget === 'holders' ? (
           <div className='flex items-center justify-between gap-4'>
             <span className='text-[#8f9482]'>{locale.distributor}</span>
-            <span className='max-w-[60%] truncate text-right text-[#f3f1e8]'>{predictedDistributorAddress ?? '—'}</span>
+              <span className='max-w-[60%] truncate text-right text-[#f3f1e8]'>{resolvedPredictedDistributorAddress ?? '—'}</span>
           </div>
         ) : null}
       </div>
       <p className='text-sm leading-7 text-[#8f9482]'>
         {!isConnected
           ? locale.walletRequired
-          : isRobinhoodPreview
-            ? locale.robinhoodLaunchSoon
           : isWrongNetwork
             ? locale.switchNetworkFirst
+          : holderFeeUnsupported
+            ? locale.robinhoodWalletFeesOnly
+          : firstBuyUnsupported
+            ? locale.robinhoodFirstBuyDisabled
           : !name.trim() || !ticker.trim() || !resolvedQuoteToken || firstBuyAmount === undefined
             ? locale.missingFields
             : imageUploading
@@ -746,7 +796,7 @@ export function LaunchSubmitActions({
                 ? locale.quotePriceUnavailable
             : parsedTotalSupply === undefined || parsedInitialTick === undefined || parsedInitialBuyMinTokensOut === undefined || !tickAligned
               ? locale.invalidParams
-            : feeTarget === 'holders' && !predictedDistributorAddress
+            : feeTarget === 'holders' && !resolvedPredictedDistributorAddress
               ? locale.holdersPending
               : locale.launchReady}
       </p>
@@ -755,7 +805,7 @@ export function LaunchSubmitActions({
         <button
           type='button'
           onClick={primaryAction}
-          disabled={isRobinhoodPreview || !(approvalSatisfied ? canLaunch : canApprove) || isBusy}
+          disabled={!(approvalSatisfied ? canLaunch : canApprove) || isBusy}
           className='inline-flex h-11 items-center rounded-full border border-[#f6e3ac66] bg-[linear-gradient(145deg,#f7e8ba,#d1b773)] px-5 text-sm font-medium text-[#342d1a] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60'
         >
           {isBusy ? '...' : primaryLabel}

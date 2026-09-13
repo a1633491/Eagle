@@ -1,6 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
 import { createClient, type RedisClientType } from 'redis';
-import { createPublicClient, getAddress, http, isAddress, parseAbiItem } from 'viem';
+import { createPublicClient, getAddress, http, isAddress, parseAbiItem, zeroAddress } from 'viem';
 import {
   getChainConfig,
   getConfiguredFactoryAddress,
@@ -24,9 +24,16 @@ const DEBUG_SERVER_URL = 'http://127.0.0.1:7777/event';
 const DEBUG_SESSION_ID = 'token-list-missing';
 const DEBUG_ENABLED = process.env.ENABLE_DEBUG_LOGS === '1';
 
-const tokenLaunchedEvent = parseAbiItem(
+const v3TokenLaunchedEvent = parseAbiItem(
   'event TokenLaunched(address indexed token, address indexed creator, address indexed quoteToken, address pool, uint24 fee, int24 initialTick, uint256 totalSupply, uint256[] lockedPositionIds, string name, string symbol, string metadataURI)',
 );
+const robinhoodV4TokenLaunchedEvent = parseAbiItem(
+  'event TokenLaunched(address indexed token, address indexed creator, address indexed quoteToken, bytes32 poolId, uint24 fee, int24 tickSpacing, int24 initialTick, uint256 totalSupply, uint256[] lockedPositionIds, string name, string symbol, string metadataURI)',
+);
+
+function getTokenLaunchedEvent(chainKey: ChainKey) {
+  return chainKey === 'robinhood' ? robinhoodV4TokenLaunchedEvent : v3TokenLaunchedEvent;
+}
 
 type TokenTrade = {
   id: string;
@@ -1387,7 +1394,7 @@ async function syncFactoryLaunchesInternal(chainKey: ChainKey, options?: { force
       const logs = await withRpcFallback(rpcUrls, async (client) =>
         client.getLogs({
           address: factoryAddress,
-          event: tokenLaunchedEvent,
+          event: getTokenLaunchedEvent(chainKey),
           fromBlock: cursor,
           toBlock,
         }),
@@ -1403,7 +1410,8 @@ async function syncFactoryLaunchesInternal(chainKey: ChainKey, options?: { force
 
       for (const log of logs) {
         const args = log.args;
-        if (!args.token || !args.creator || !args.quoteToken || !args.pool || !args.name || !args.symbol || args.totalSupply === undefined) {
+        const poolAddress = chainKey === 'robinhood' ? zeroAddress : ('pool' in args ? args.pool : undefined);
+        if (!args.token || !args.creator || !args.quoteToken || !poolAddress || !args.name || !args.symbol || args.totalSupply === undefined) {
           continue;
         }
         const block = await withRpcFallback(rpcUrls, async (client) => client.getBlock({ blockNumber: log.blockNumber }));
@@ -1411,7 +1419,7 @@ async function syncFactoryLaunchesInternal(chainKey: ChainKey, options?: { force
           chainKey,
           address: args.token,
           creator: args.creator,
-          poolAddress: args.pool,
+          poolAddress,
           quoteToken: args.quoteToken,
           quoteSymbol: quoteSymbolFromAddress(args.quoteToken, chainKey),
           name: args.name,

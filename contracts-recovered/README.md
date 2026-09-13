@@ -80,7 +80,28 @@ This is useful for understanding the locker, but in the deployable Eagle archite
 - Creator share: remains in `claimableFees` and must be claimed manually
 - Holder distributor path: still works, because the distributor is just another creator fee recipient that calls `claimFees`
 
-## Quick Start
+## Robinhood v4 Quick Start
+
+For the Robinhood Chain Uni v4 launch suite, add these extra envs on top of the standard owner / treasury / deployer settings:
+
+- `ROBINHOOD_RPC_URL`
+- `ROBINHOODSCAN_API_KEY` (optional, for Blockscout verification)
+- `UNISWAP_V4_POOL_MANAGER=0x8366a39CC670B4001A1121B8F6A443A643e40951`
+- `UNISWAP_V4_POSITION_MANAGER=0x58daec3116aae6D93017bAAea7749052E8a04fA7`
+- `UNISWAP_V4_QUOTER=0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94`
+- `UNISWAP_V4_STATE_VIEW=0xF3334192D15450CdD385c8B70e03f9A6bD9E673b`
+- `UNISWAP_UNIVERSAL_ROUTER=0x06AfBA43Fd06227fA663b0DAecF536f6EaA6bf99`
+- `PERMIT2=0x000000000022D473030F116dDEE9F6B43aC78BA3`
+- `WETH=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73`
+
+The Robinhood-specific scripts are:
+
+- `npm run deploy:robinhood-v4`
+- `npm run verify:robinhood-v4`
+
+Deployment output is written to `deployments/robinhood-v4.json`.
+
+## Legacy Quick Start
 
 1. Copy `.env.example` to `.env`
 2. Fill in your owner, treasury, RPC, deployer key, and `BSCSCAN_API_KEY`

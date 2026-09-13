@@ -40,12 +40,39 @@ const config = {
       chainId: 8453,
       accounts,
     },
+    robinhood: {
+      url: process.env.ROBINHOOD_RPC_URL || '',
+      chainId: 4663,
+      accounts,
+    },
   },
   etherscan: {
     apiKey: {
       bsc: process.env.BSCSCAN_API_KEY || '',
-      base: process.env.BASESCAN_API_KEY || '',
+      base: process.env.ETHERSCAN_API_KEY || process.env.BASESCAN_API_KEY || '',
+      robinhood: process.env.ROBINHOODSCAN_API_KEY || '',
     },
+    customChains: [
+      {
+        network: 'base',
+        chainId: 8453,
+        urls: {
+          apiURL: 'https://api.etherscan.io/v2/api?chainid=8453',
+          browserURL: 'https://basescan.org',
+        },
+      },
+      {
+        network: 'robinhood',
+        chainId: 4663,
+        urls: {
+          apiURL: 'https://robinhoodchain.blockscout.com/api',
+          browserURL: 'https://robinhoodchain.blockscout.com',
+        },
+      },
+    ],
+  },
+  sourcify: {
+    enabled: true,
   },
 };
 
