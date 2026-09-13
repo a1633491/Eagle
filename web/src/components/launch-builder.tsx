@@ -175,6 +175,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
   const resolvedCustomQuoteToken = pair === 'ANY' && isAddress(quoteTokenInput) ? quoteTokenInput : undefined;
 
   const { data: customQuoteSymbol } = useReadContract({
+    chainId: chain.chainId,
     address: resolvedCustomQuoteToken,
     abi: eagleErc20Abi,
     functionName: 'symbol',
@@ -184,6 +185,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
   });
 
   const { data: customQuoteName } = useReadContract({
+    chainId: chain.chainId,
     address: resolvedCustomQuoteToken,
     abi: eagleErc20Abi,
     functionName: 'name',

@@ -104,7 +104,7 @@ export function TokenChainActions({
 }) {
   const locale = copy[lang];
   const eagleContracts = getEagleContracts(chainKey);
-  const publicClient = usePublicClient();
+  const publicClient = usePublicClient({ chainId: eagleContracts.chainId });
   const { address, isConnected } = useAccount();
   const { writeContractAsync } = useWriteContract();
   const [busyAction, setBusyAction] = useState<'collect' | 'claim' | 'distribute' | null>(null);
@@ -114,6 +114,7 @@ export function TokenChainActions({
   const normalizedToken = isAddress(tokenAddress) ? (tokenAddress as Address) : undefined;
 
   const { data: launchRecord } = useReadContract({
+    chainId: eagleContracts.chainId,
     address: eagleContracts.factory,
     abi: eagleFactoryAbi,
     functionName: 'launches',
@@ -129,6 +130,7 @@ export function TokenChainActions({
   const isLaunched = Boolean(pool && pool !== zeroAddress);
 
   const { data: distributorOf } = useReadContract({
+    chainId: eagleContracts.chainId,
     address: eagleContracts.distributorFactory,
     abi: eagleDistributorFactoryAbi,
     functionName: 'distributorOf',
@@ -139,6 +141,7 @@ export function TokenChainActions({
   });
 
   const { data: predictedDistributor } = useReadContract({
+    chainId: eagleContracts.chainId,
     address: eagleContracts.distributorFactory,
     abi: eagleDistributorFactoryAbi,
     functionName: 'predict',
@@ -149,6 +152,7 @@ export function TokenChainActions({
   });
 
   const { data: quoteDecimals } = useReadContract({
+    chainId: eagleContracts.chainId,
     address: quoteToken,
     abi: eagleErc20Abi,
     functionName: 'decimals',
@@ -158,6 +162,7 @@ export function TokenChainActions({
   });
 
   const { data: quoteSymbol } = useReadContract({
+    chainId: eagleContracts.chainId,
     address: quoteToken,
     abi: eagleErc20Abi,
     functionName: 'symbol',
@@ -167,6 +172,7 @@ export function TokenChainActions({
   });
 
   const { data: claimableFees } = useReadContract({
+    chainId: eagleContracts.chainId,
     address: eagleContracts.locker,
     abi: eagleLiquidityLockerAbi,
     functionName: 'claimableFees',

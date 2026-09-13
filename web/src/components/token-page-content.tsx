@@ -80,13 +80,14 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
   const contracts = getEagleContracts(chainKey);
   const factoryAbi = getLaunchFactoryAbi(chainKey) as Abi;
   const isRobinhoodChain = chainKey === 'robinhood';
-  const publicClient = usePublicClient();
+  const publicClient = usePublicClient({ chainId: contracts.chainId });
   const [launchTimestamp, setLaunchTimestamp] = useState<bigint | undefined>();
   const [launchTxHash, setLaunchTxHash] = useState<string | undefined>();
 
   const normalizedToken = isAddress(token.address) ? (token.address as Address) : undefined;
 
   const { data: launchRecord } = useReadContract({
+    chainId: contracts.chainId,
     address: contracts.factory,
     abi: factoryAbi,
     functionName: 'launches',
@@ -103,6 +104,7 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
   const onchainLaunchBlock = readBigint(launchRecordTuple?.[isRobinhoodChain ? 7 : 5]);
 
   const { data: tokenSymbolData } = useReadContract({
+    chainId: contracts.chainId,
     address: normalizedToken,
     abi: eagleErc20Abi,
     functionName: 'symbol',
@@ -112,6 +114,7 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
   });
 
   const { data: tokenNameData } = useReadContract({
+    chainId: contracts.chainId,
     address: normalizedToken,
     abi: eagleErc20Abi,
     functionName: 'name',
@@ -121,6 +124,7 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
   });
 
   const { data: tokenDecimalsData } = useReadContract({
+    chainId: contracts.chainId,
     address: normalizedToken,
     abi: eagleErc20Abi,
     functionName: 'decimals',
@@ -130,6 +134,7 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
   });
 
   const { data: tokenTotalSupplyData } = useReadContract({
+    chainId: contracts.chainId,
     address: normalizedToken,
     abi: eagleErc20Abi,
     functionName: 'totalSupply',
@@ -139,6 +144,7 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
   });
 
   const { data: quoteSymbolData } = useReadContract({
+    chainId: contracts.chainId,
     address: onchainQuoteToken,
     abi: eagleErc20Abi,
     functionName: 'symbol',
@@ -149,6 +155,7 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
   });
 
   const { data: quoteDecimalsData } = useReadContract({
+    chainId: contracts.chainId,
     address: onchainQuoteToken,
     abi: eagleErc20Abi,
     functionName: 'decimals',
@@ -206,6 +213,7 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
   const poolAddress = onchainPool && onchainPool !== zeroAddress ? onchainPool : token.poolAddress;
   const creatorAddress = onchainCreator && onchainCreator !== zeroAddress ? onchainCreator : token.creator;
   const { data: creatorClaimableFees } = useReadContract({
+    chainId: contracts.chainId,
     address: contracts.locker,
     abi: eagleLiquidityLockerAbi,
     functionName: 'claimableFees',

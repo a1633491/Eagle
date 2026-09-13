@@ -337,7 +337,7 @@ export function LaunchSubmitActions({
   const isRobinhoodChain = chainKey === 'robinhood';
   const factoryAbi = getLaunchFactoryAbi(chainKey) as Abi;
   const router = useRouter();
-  const publicClient = usePublicClient();
+  const publicClient = usePublicClient({ chainId: contracts.chainId });
   const { address, isConnected, chainId: walletChainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
@@ -357,6 +357,7 @@ export function LaunchSubmitActions({
   }, [contracts.stableToken, contracts.wrappedNativeToken, pair, quoteTokenInput]);
 
   const { data: launchFeeWei } = useReadContract({
+    chainId: contracts.chainId,
     address: contracts.factory,
     abi: factoryAbi,
     functionName: 'launchFeeWei',
@@ -367,6 +368,7 @@ export function LaunchSubmitActions({
   const resolvedLaunchFeeWei = readBigint(launchFeeWei) ?? defaultLaunchConfig.maxLaunchFeeWeiFallback;
 
   const { data: customQuoteDecimals } = useReadContract({
+    chainId: contracts.chainId,
     address: resolvedQuoteToken,
     abi: eagleErc20Abi,
     functionName: 'decimals',
@@ -376,6 +378,7 @@ export function LaunchSubmitActions({
   });
 
   const { data: customQuoteSymbol } = useReadContract({
+    chainId: contracts.chainId,
     address: resolvedQuoteToken,
     abi: eagleErc20Abi,
     functionName: 'symbol',
@@ -475,6 +478,7 @@ export function LaunchSubmitActions({
   const readyForPrediction = Boolean(address && name.trim() && ticker.trim());
 
   const { data: predictedTokenAddress } = useReadContract({
+    chainId: contracts.chainId,
     address: contracts.factory,
     abi: factoryAbi,
     functionName: 'predictTokenAddress',
@@ -494,6 +498,7 @@ export function LaunchSubmitActions({
   });
 
   const { data: predictedDistributorAddress } = useReadContract({
+    chainId: contracts.chainId,
     address: contracts.distributorFactory,
     abi: eagleDistributorFactoryAbi,
     functionName: 'predict',
@@ -512,6 +517,7 @@ export function LaunchSubmitActions({
   const needsApproval = !isRobinhoodChain && pair !== 'BNB' && Boolean(firstBuyAmount && firstBuyAmount > BigInt(0));
 
   const { data: currentAllowance, refetch: refetchAllowance } = useReadContract({
+    chainId: contracts.chainId,
     address: resolvedQuoteToken,
     abi: eagleErc20Abi,
     functionName: 'allowance',

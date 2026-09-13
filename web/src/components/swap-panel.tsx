@@ -103,7 +103,7 @@ export function SwapPanel({
   creatorClaimableText?: string;
 }) {
   const { address, isConnected, chainId } = useAccount();
-  const publicClient = usePublicClient();
+  const publicClient = usePublicClient({ chainId: robinhoodChain.id });
   const { switchChainAsync } = useSwitchChain();
   const { sendTransactionAsync } = useSendTransaction();
   const [pay, setPay] = useState('0.00');
@@ -123,6 +123,7 @@ export function SwapPanel({
   const receiveTokenAddress = side === 'Buy' ? (token.address as Address) : quoteTokenAddress;
 
   const { data: payTokenDecimals } = useReadContract({
+    chainId: robinhoodChain.id,
     address: payTokenAddress,
     abi: eagleErc20Abi,
     functionName: 'decimals',
@@ -132,6 +133,7 @@ export function SwapPanel({
   });
 
   const { data: receiveTokenDecimals } = useReadContract({
+    chainId: robinhoodChain.id,
     address: receiveTokenAddress,
     abi: eagleErc20Abi,
     functionName: 'decimals',
