@@ -25,9 +25,9 @@ function getDocsContent(lang: Lang, chainKey: ChainKey) {
   const contracts =
     chainKey === 'robinhood'
       ? ([
-          ['EagleFactory', '0xA1821b220716cE0bADb708Cd7A507D791f83437a'],
-          ['EagleLiquidityLocker', '0xf14Bc7e40Db50D5655957EFE87cB6f20d11AE872'],
-          ['EagleDistributorFactory', '0xaE62EE1fb7Db56Db5ef7DeC817E573b3DDE0Af23'],
+          ['EagleFactory', '0x3A4CE33bb65b9429465b6EAda2F29C9f7bF0a122'],
+          ['EagleLiquidityLocker', '0x7DF4EE3EF16856cc2A834860558ac72Dea997641'],
+          ['EagleDistributorFactory', '0x834BEB67eA63d4246BD6B7D1928b2EBD57838F8c'],
           ['Uni V3 Factory', '0x1f7d7550B1b028f7571E69A784071F0205FD2EfA'],
           ['Position Manager', '0x73991a25C818Bf1f1128dEAaB1492D45638DE0D3'],
           ['Wrapped ETH', '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73'],

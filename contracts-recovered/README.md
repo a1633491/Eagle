@@ -145,10 +145,10 @@ Deployment output is written to `deployments/robinhood.json`.
 
 Current Robinhood Brew deployment:
 
-- `EagleFactory`: `0xA1821b220716cE0bADb708Cd7A507D791f83437a`
-- `EagleLiquidityLocker`: `0xf14Bc7e40Db50D5655957EFE87cB6f20d11AE872`
-- `EagleDistributorFactory`: `0xaE62EE1fb7Db56Db5ef7DeC817E573b3DDE0Af23`
-- Factory deployment block: `61867248`
+- `EagleFactory`: `0x3A4CE33bb65b9429465b6EAda2F29C9f7bF0a122`
+- `EagleLiquidityLocker`: `0x7DF4EE3EF16856cc2A834860558ac72Dea997641`
+- `EagleDistributorFactory`: `0x834BEB67eA63d4246BD6B7D1928b2EBD57838F8c`
+- Factory deployment block: `61971645`
 
 ## Robinhood v4 Quick Start
 

@@ -649,6 +649,12 @@ interface IPancakeV3SwapCallback {
     function pancakeV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external;
 }
 
+/// @dev Uni v3 keeps the original callback name.
+
+interface IUniswapV3SwapCallback {
+    function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external;
+}
+
 /// @dev Minimal PancakeSwap V3 NonfungiblePositionManager surface used by Eagle.
 /// Struct layouts match pancake-v3-contracts (identical to Uniswap V3 periphery).
 
@@ -1786,7 +1792,7 @@ contract EagleToken is ERC20 {
  * from ERC-721 asset contracts.
  */
 
-contract EagleFactory is Ownable2Step, ReentrancyGuard, IPancakeV3SwapCallback {
+contract EagleFactory is Ownable2Step, ReentrancyGuard, IPancakeV3SwapCallback, IUniswapV3SwapCallback {
     using SafeERC20 for IERC20;
 
     /// @notice launch on eagle.family
@@ -2214,13 +2220,22 @@ contract EagleFactory is Ownable2Step, ReentrancyGuard, IPancakeV3SwapCallback {
         emit InitialBuyExecuted(token, recipient, quoteSpent, tokensOut);
     }
 
-    /// @inheritdoc IPancakeV3SwapCallback
-    function pancakeV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {
+    function _handleSwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) internal {
         address pool = _activeSwapPool;
         if (pool == address(0) || msg.sender != pool) revert UnexpectedSwapCallback();
         address quoteToken = abi.decode(data, (address));
         uint256 owed = uint256(amount0Delta > 0 ? amount0Delta : amount1Delta);
         if (owed > 0) IERC20(quoteToken).safeTransfer(pool, owed);
+    }
+
+    /// @inheritdoc IPancakeV3SwapCallback
+    function pancakeV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {
+        _handleSwapCallback(amount0Delta, amount1Delta, data);
+    }
+
+    /// @inheritdoc IUniswapV3SwapCallback
+    function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {
+        _handleSwapCallback(amount0Delta, amount1Delta, data);
     }
 
     /// @dev Accepts BNB only while unwrapping WBNB for initial-buy refunds.
@@ -2273,7 +2288,7 @@ contract EagleFactory is Ownable2Step, ReentrancyGuard, IPancakeV3SwapCallback {
 /// (the launch form's "fees to holders" option) or later via
 /// `setCreatorFeeRecipient`. Opting in is PERMANENT: nothing in this contract
 /// can hand the recipient role back.
-contract EagleHolderDistributor is IPancakeV3SwapCallback, ReentrancyGuard {
+contract EagleHolderDistributor is IPancakeV3SwapCallback, IUniswapV3SwapCallback, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @notice launch on eagle.family
@@ -2338,11 +2353,18 @@ contract EagleHolderDistributor is IPancakeV3SwapCallback, ReentrancyGuard {
         emit DistributedToHolders(msg.sender, quoteSpent, tokensBurned);
     }
 
-    /// @inheritdoc IPancakeV3SwapCallback
-    function pancakeV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata) external {
+    function _handleSwapCallback(int256 amount0Delta, int256 amount1Delta) internal {
         if (!_inSwap || msg.sender != pool) revert UnexpectedSwapCallback();
         uint256 owed = uint256(amount0Delta > 0 ? amount0Delta : amount1Delta);
         if (owed > 0) IERC20(quoteToken).safeTransfer(pool, owed);
+    }
+
+    function pancakeV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata) external {
+        _handleSwapCallback(amount0Delta, amount1Delta);
+    }
+
+    function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata) external {
+        _handleSwapCallback(amount0Delta, amount1Delta);
     }
 }
 

@@ -7,14 +7,14 @@
   "wbnb": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
   "owner": "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
   "treasury": "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
-  "launchFeeWei": "10000000000000000",
+  "launchFeeWei": "0",
   "protocolLpFeeBps": 5000,
-  "eagleFactory": "0xA1821b220716cE0bADb708Cd7A507D791f83437a",
-  "eagleLiquidityLocker": "0xf14Bc7e40Db50D5655957EFE87cB6f20d11AE872",
-  "eagleDistributorFactory": "0xaE62EE1fb7Db56Db5ef7DeC817E573b3DDE0Af23",
+  "eagleFactory": "0x3A4CE33bb65b9429465b6EAda2F29C9f7bF0a122",
+  "eagleLiquidityLocker": "0x7DF4EE3EF16856cc2A834860558ac72Dea997641",
+  "eagleDistributorFactory": "0x834BEB67eA63d4246BD6B7D1928b2EBD57838F8c",
   "verification": {
     "eagleFactory": {
-      "address": "0xA1821b220716cE0bADb708Cd7A507D791f83437a",
+      "address": "0x3A4CE33bb65b9429465b6EAda2F29C9f7bF0a122",
       "contract": "contracts/BrewLaunchSuite.sol:EagleFactory",
       "constructorArguments": [
         "0x1f7d7550B1b028f7571E69A784071F0205FD2EfA",
@@ -22,23 +22,23 @@
         "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
         "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
         "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
-        "10000000000000000",
+        "0",
         5000
       ]
     },
     "eagleLiquidityLocker": {
-      "address": "0xf14Bc7e40Db50D5655957EFE87cB6f20d11AE872",
+      "address": "0x7DF4EE3EF16856cc2A834860558ac72Dea997641",
       "contract": "contracts/BrewLaunchSuite.sol:EagleLiquidityLocker",
       "constructorArguments": [
         "0x73991a25C818Bf1f1128dEAaB1492D45638DE0D3",
-        "0xA1821b220716cE0bADb708Cd7A507D791f83437a"
+        "0x3A4CE33bb65b9429465b6EAda2F29C9f7bF0a122"
       ]
     },
     "eagleDistributorFactory": {
-      "address": "0xaE62EE1fb7Db56Db5ef7DeC817E573b3DDE0Af23",
+      "address": "0x834BEB67eA63d4246BD6B7D1928b2EBD57838F8c",
       "contract": "contracts/BrewLaunchSuite.sol:EagleDistributorFactory",
       "constructorArguments": [
-        "0xA1821b220716cE0bADb708Cd7A507D791f83437a"
+        "0x3A4CE33bb65b9429465b6EAda2F29C9f7bF0a122"
       ]
     }
   }

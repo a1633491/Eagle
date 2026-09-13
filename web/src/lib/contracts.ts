@@ -317,7 +317,7 @@ export const defaultLaunchConfig = {
   totalSupply: BigInt(1_000_000_000) * BigInt(10) ** BigInt(18),
   feeTier: 10_000,
   initialTick: 0,
-  targetLaunchPriceUsd: 0.0000049,
+  targetLaunchPriceUsd: 0.0000025,
   initialBuyMinTokensOut: BigInt(0),
   maxLaunchFeeWeiFallback: BigInt('10000000000000000'),
 } as const;

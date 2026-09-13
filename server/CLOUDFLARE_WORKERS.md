@@ -76,8 +76,8 @@ BASE_RPC_URL=https://mainnet.base.org
 BASE_FACTORY_ADDRESS=0xEfca26BAc433975a27E894eeD196C8a1D32c4beE
 
 ROBINHOOD_RPC_URL=https://robinhood.drpc.org
-ROBINHOOD_FACTORY_ADDRESS=0xA1821b220716cE0bADb708Cd7A507D791f83437a
-ROBINHOOD_FACTORY_START_BLOCK=61867248
+ROBINHOOD_FACTORY_ADDRESS=0x3A4CE33bb65b9429465b6EAda2F29C9f7bF0a122
+ROBINHOOD_FACTORY_START_BLOCK=61971645
 ROBINHOOD_WETH_ADDRESS=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73
 ROBINHOOD_STABLE_TOKEN_ADDRESS=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168
 ROBINHOOD_STABLE_SYMBOL=USDG
@@ -121,7 +121,7 @@ npm run deploy:worker
 
 - D1 is the primary Workers storage target for `tokens` and `sync_state`.
 - `GET /api/tokens`, `GET /api/tokens/:address`, `GET /api/tokens/sync-status`, and `POST /api/tokens/sync` accept `?chain=bsc|base|robinhood`.
-- BSC and Base use the shared Brew deployment trio `0xEfca... / 0x01ec... / 0x5BD1...`; Robinhood uses the Uni v3-backed Brew deployment `0xA182... / 0xf14B... / 0xaE62...`.
+- BSC and Base use the shared Brew deployment trio `0xEfca... / 0x01ec... / 0x5BD1...`; Robinhood uses the Uni v3-backed Brew deployment `0x3A4C... / 0x7DF4... / 0x834B...`.
 - `POST /api/swap/quote`, `POST /api/swap/check-approval`, and `POST /api/swap/build` are swap helper routes. Robinhood now uses the Brew launch flow plus Uni v3 market infrastructure.
 - Redis is intentionally disabled in the Workers runtime in the current implementation.
 - MongoDB is still used, but the runtime uses smaller pool and timeout settings to reduce Workers-side connection pressure.
