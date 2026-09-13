@@ -70,6 +70,7 @@ const copy = {
     imageUploading: '代币头像上传中，请稍候...',
     loadingQuotePrice: '正在根据配对币价格计算默认开盘价...',
     quotePriceUnavailable: '暂时无法获取该配对币价格，当前不能按默认开盘价发射。',
+    loadingLaunchFee: '正在读取链上创建费，请稍候...',
     metadataTooLarge: '代币资料过长，已超出合约允许的 metadata 长度，请缩短简介或社媒链接。',
     metadataCompacted: '链上 metadata 已自动压缩到合约允许的长度内。',
     waitingApproval: '等待钱包授权首购资产...',
@@ -102,6 +103,7 @@ const copy = {
     imageUploading: 'Token image is uploading. Please wait...',
     loadingQuotePrice: 'Calculating the default starting price from the quote token...',
     quotePriceUnavailable: 'A usable USD price for this quote token is unavailable right now.',
+    loadingLaunchFee: 'Loading the on-chain launch fee...',
     metadataTooLarge: 'Token metadata is too long for the contract. Shorten the description or social links.',
     metadataCompacted: 'On-chain metadata was compacted automatically to satisfy the contract length limit.',
     waitingApproval: 'Waiting for wallet approval...',
@@ -134,6 +136,7 @@ const copy = {
     imageUploading: 'トークン画像をアップロード中です。少々お待ちください。',
     loadingQuotePrice: 'ペアトークン価格からデフォルト開始価格を計算しています...',
     quotePriceUnavailable: 'このペアトークンの価格を取得できないため、現在はローンチできません。',
+    loadingLaunchFee: 'オンチェーンの作成手数料を読み込んでいます...',
     metadataTooLarge: 'トークンの metadata が長すぎてコントラクト制限を超えています。説明文か SNS リンクを短くしてください。',
     metadataCompacted: 'オンチェーン metadata はコントラクト制限に収まるよう自動で圧縮されました。',
     waitingApproval: 'ウォレット承認を待っています...',
@@ -422,7 +425,8 @@ export function LaunchSubmitActions({
       enabled: Boolean(contracts.factory),
     },
   });
-  const resolvedLaunchFeeWei = readBigint(launchFeeWei) ?? defaultLaunchConfig.maxLaunchFeeWeiFallback;
+  const resolvedLaunchFeeWei = readBigint(launchFeeWei);
+  const launchFeeUnavailable = resolvedLaunchFeeWei === undefined;
 
   const { data: customQuoteDecimals } = useReadContract({
     chainId: contracts.chainId,
@@ -607,6 +611,7 @@ export function LaunchSubmitActions({
     Boolean(name.trim()) &&
     Boolean(ticker.trim()) &&
     Boolean(resolvedQuoteToken) &&
+    !launchFeeUnavailable &&
     firstBuyAmount !== undefined &&
     parsedTotalSupply !== undefined &&
     parsedInitialTick !== undefined &&
@@ -617,7 +622,7 @@ export function LaunchSubmitActions({
     !holderFeeUnsupported &&
     !firstBuyUnsupported &&
     tickAligned &&
-      (feeTarget !== 'holders' || Boolean(resolvedPredictedDistributorAddress));
+    (feeTarget !== 'holders' || Boolean(resolvedPredictedDistributorAddress));
 
   const canLaunch = formReady && approvalSatisfied && !isWrongNetwork;
   const canApprove = formReady && needsApproval && !approvalSatisfied && !isWrongNetwork;
@@ -670,15 +675,19 @@ export function LaunchSubmitActions({
       parsedInitialBuyMinTokensOut === undefined ||
       !metadataUri ||
       !tickAligned ||
-      !publicClient
-      || !contracts.factory
+      !publicClient ||
+      !contracts.factory
     ) {
       return;
     }
     try {
       setIsBusy(true);
       setStatus(locale.waitingLaunch);
-        const effectiveLaunchFee = resolvedLaunchFeeWei;
+      const effectiveLaunchFee = resolvedLaunchFeeWei;
+      if (effectiveLaunchFee === undefined) {
+        setStatus(locale.loadingLaunchFee);
+        return;
+      }
       const launchArgs = isRobinhoodChain
         ? [
             {
@@ -718,56 +727,57 @@ export function LaunchSubmitActions({
               maxLaunchFeeWei: effectiveLaunchFee,
             },
           ];
+      const txValue = effectiveLaunchFee + (!isRobinhoodChain && pair === 'BNB' ? firstBuyAmount : BigInt(0));
       const hash = await writeContractAsync({
         address: contracts.factory,
         abi: factoryAbi,
         functionName: 'launch',
         args: launchArgs,
-        value: effectiveLaunchFee + (!isRobinhoodChain && pair === 'BNB' ? firstBuyAmount : BigInt(0)),
+        value: txValue,
       });
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
-        const launchEvents = parseEventLogs({
+      const launchEvents = parseEventLogs({
         abi: factoryAbi,
         eventName: 'TokenLaunched',
         logs: receipt.logs,
         strict: false,
-        }) as Array<{ args: Record<string, unknown> }>;
+      }) as Array<{ args: Record<string, unknown> }>;
       const matchedLaunchEvent =
         launchEvents.find((event) =>
-            resolvedPredictedTokenAddress
-              ? typeof event.args.token === 'string' && event.args.token.toLowerCase() === resolvedPredictedTokenAddress.toLowerCase()
-              : true,
+          resolvedPredictedTokenAddress
+            ? typeof event.args.token === 'string' && event.args.token.toLowerCase() === resolvedPredictedTokenAddress.toLowerCase()
+            : true,
         ) ?? launchEvents[0];
-        const eventArgs = matchedLaunchEvent?.args;
-        const launchedTokenAddress = readAddress(eventArgs?.token) ?? resolvedPredictedTokenAddress;
+      const eventArgs = matchedLaunchEvent?.args;
+      const launchedTokenAddress = readAddress(eventArgs?.token) ?? resolvedPredictedTokenAddress;
 
       if (launchedTokenAddress) {
         try {
           const block = await publicClient.getBlock({ blockNumber: receipt.blockNumber });
           const launchRecord = (await publicClient.readContract({
-              address: contracts.factory,
-              abi: factoryAbi,
-              functionName: 'launches',
-              args: [launchedTokenAddress],
-            })) as readonly unknown[];
+            address: contracts.factory,
+            abi: factoryAbi,
+            functionName: 'launches',
+            args: [launchedTokenAddress],
+          })) as readonly unknown[];
           const poolAddress = isRobinhoodChain
             ? zeroAddress
-              : (readAddress(eventArgs?.pool) ?? readAddress(launchRecord?.[2]) ?? zeroAddress);
-            const quoteToken = readAddress(eventArgs?.quoteToken) ?? readAddress(launchRecord?.[1]);
+            : (readAddress(eventArgs?.pool) ?? readAddress(launchRecord?.[2]) ?? zeroAddress);
+          const quoteToken = readAddress(eventArgs?.quoteToken) ?? readAddress(launchRecord?.[1]);
           if (poolAddress && quoteToken) {
             await registerLaunchedTokenWithRetry({
               chainKey,
               address: launchedTokenAddress,
-                name: typeof eventArgs?.name === 'string' ? eventArgs.name : name.trim(),
-                symbol: typeof eventArgs?.symbol === 'string' ? eventArgs.symbol : ticker.trim(),
+              name: typeof eventArgs?.name === 'string' ? eventArgs.name : name.trim(),
+              symbol: typeof eventArgs?.symbol === 'string' ? eventArgs.symbol : ticker.trim(),
               description: story.trim(),
               creator: address as Address,
               poolAddress,
               quoteToken,
               quoteSymbol: resolvedQuoteSymbol,
               totalSupply: parsedTotalSupply,
-                metadataURI: typeof eventArgs?.metadataURI === 'string' ? eventArgs.metadataURI : metadataUri,
-                feeTier: readNumber(eventArgs?.fee) ?? feeTier,
+              metadataURI: typeof eventArgs?.metadataURI === 'string' ? eventArgs.metadataURI : metadataUri,
+              feeTier: readNumber(eventArgs?.fee) ?? feeTier,
               launchedAt: new Date(Number(block.timestamp) * 1000).toISOString(),
             });
           }
@@ -808,7 +818,7 @@ export function LaunchSubmitActions({
       : locale.launchNow;
 
   const primaryAction = isWrongNetwork ? handleSwitchNetwork : approvalSatisfied ? handleLaunch : handleApprove;
-    const launchFeeText = formatEther(resolvedLaunchFeeWei);
+  const launchFeeText = resolvedLaunchFeeWei !== undefined ? formatEther(resolvedLaunchFeeWei) : '—';
   const firstBuyText = firstBuyAmount !== undefined ? formatUnits(firstBuyAmount, quoteDecimals) : '0';
 
   return (
@@ -834,12 +844,12 @@ export function LaunchSubmitActions({
         </div>
         <div className='flex items-center justify-between gap-4'>
           <span className='text-[#8f9482]'>{locale.predictedToken}</span>
-            <span className='max-w-[60%] truncate text-right text-[#f3f1e8]'>{resolvedPredictedTokenAddress ?? '—'}</span>
+          <span className='max-w-[60%] truncate text-right text-[#f3f1e8]'>{resolvedPredictedTokenAddress ?? '—'}</span>
         </div>
         {feeTarget === 'holders' ? (
           <div className='flex items-center justify-between gap-4'>
             <span className='text-[#8f9482]'>{locale.distributor}</span>
-              <span className='max-w-[60%] truncate text-right text-[#f3f1e8]'>{resolvedPredictedDistributorAddress ?? '—'}</span>
+            <span className='max-w-[60%] truncate text-right text-[#f3f1e8]'>{resolvedPredictedDistributorAddress ?? '—'}</span>
           </div>
         ) : null}
       </div>
@@ -852,21 +862,23 @@ export function LaunchSubmitActions({
             ? locale.robinhoodWalletFeesOnly
           : firstBuyUnsupported
             ? locale.robinhoodFirstBuyDisabled
+          : launchFeeUnavailable
+            ? locale.loadingLaunchFee
           : !name.trim() || !ticker.trim() || !resolvedQuoteToken || firstBuyAmount === undefined
             ? locale.missingFields
             : imageUploading
               ? locale.imageUploading
             : quotePriceLoading
               ? locale.loadingQuotePrice
-              : quoteUsdPrice === undefined
-                ? locale.quotePriceUnavailable
-              : !metadataUri
-                ? locale.metadataTooLarge
-            : parsedTotalSupply === undefined || parsedInitialTick === undefined || parsedInitialBuyMinTokensOut === undefined || !tickAligned
-              ? locale.invalidParams
-            : feeTarget === 'holders' && !resolvedPredictedDistributorAddress
-              ? locale.holdersPending
-              : locale.launchReady}
+            : quoteUsdPrice === undefined
+              ? locale.quotePriceUnavailable
+            : !metadataUri
+              ? locale.metadataTooLarge
+          : parsedTotalSupply === undefined || parsedInitialTick === undefined || parsedInitialBuyMinTokensOut === undefined || !tickAligned
+            ? locale.invalidParams
+          : feeTarget === 'holders' && !resolvedPredictedDistributorAddress
+            ? locale.holdersPending
+          : locale.launchReady}
       </p>
       {metadataCompacted && metadataUri ? (
         <p className='text-xs text-[#8f9482]'>{locale.metadataCompacted}</p>

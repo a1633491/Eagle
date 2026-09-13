@@ -73,6 +73,12 @@ interface IUniswapV4PoolManager {
 interface IUniswapV4PositionManager {
     function modifyLiquidities(bytes calldata unlockData, uint256 deadline) external payable;
     function ownerOf(uint256 tokenId) external view returns (address owner);
+    function nextTokenId() external view returns (uint256 tokenId);
+    function permit2() external view returns (address permit2_);
+}
+
+interface IPermit2AllowanceTransfer {
+    function approve(address token, address spender, uint160 amount, uint48 expiration) external;
 }
 
 interface IEagleV4FeeConfig {
@@ -520,12 +526,16 @@ contract RobinhoodV4Factory is Ownable2Step, ReentrancyGuard {
         internal
         returns (uint256[] memory positionIds)
     {
-        IERC20(token).forceApprove(address(positionManager), params.totalSupply);
+        if (params.totalSupply > type(uint160).max) revert AmountTooLarge();
+        address permit2 = positionManager.permit2();
+        IERC20(token).forceApprove(permit2, params.totalSupply);
+        IPermit2AllowanceTransfer(permit2).approve(
+            token, address(positionManager), uint160(params.totalSupply), type(uint48).max
+        );
 
         uint256 count = params.positions.length == 0 ? 1 : params.positions.length;
         positionIds = new uint256[](count);
         uint256 remaining = params.totalSupply;
-        uint256 lastSeenTokenId = locker.lastReceivedTokenId();
         address creatorRecipient = params.creatorFeeRecipient == address(0) ? msg.sender : params.creatorFeeRecipient;
 
         for (uint256 i = 0; i < count; i++) {
@@ -541,6 +551,7 @@ contract RobinhoodV4Factory is Ownable2Step, ReentrancyGuard {
 
             bytes memory actions = abi.encodePacked(RobinhoodV4Actions.MINT_POSITION, RobinhoodV4Actions.SETTLE_PAIR);
             bytes[] memory actionParams = new bytes[](2);
+            uint256 tokenId = positionManager.nextTokenId();
             actionParams[0] = abi.encode(
                 poolKey,
                 mintLower,
@@ -554,14 +565,13 @@ contract RobinhoodV4Factory is Ownable2Step, ReentrancyGuard {
             actionParams[1] = abi.encode(poolKey.currency0, poolKey.currency1);
             positionManager.modifyLiquidities(abi.encode(actions, actionParams), block.timestamp);
 
-            uint256 tokenId = locker.lastReceivedTokenId();
-            if (tokenId == lastSeenTokenId) revert PositionMintFailed();
-            lastSeenTokenId = tokenId;
+            if (positionManager.ownerOf(tokenId) != address(locker)) revert PositionMintFailed();
             positionIds[i] = tokenId;
             locker.assignPosition(tokenId, token, params.quoteToken, creatorRecipient, protocolLpFeeBps);
         }
 
-        IERC20(token).forceApprove(address(positionManager), 0);
+        IPermit2AllowanceTransfer(permit2).approve(token, address(positionManager), 0, 0);
+        IERC20(token).forceApprove(permit2, 0);
         uint256 dust = IERC20(token).balanceOf(address(this));
         if (dust > 0) IERC20(token).safeTransfer(DEAD, dust);
     }
