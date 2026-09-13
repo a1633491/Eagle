@@ -36,6 +36,12 @@ wrangler secret put EAGLE_FACTORY_START_BLOCK
 wrangler secret put BASE_RPC_URL
 wrangler secret put BASE_FACTORY_ADDRESS
 wrangler secret put BASE_FACTORY_START_BLOCK
+wrangler secret put ROBINHOOD_RPC_URL
+wrangler secret put ROBINHOOD_FACTORY_ADDRESS
+wrangler secret put ROBINHOOD_FACTORY_START_BLOCK
+wrangler secret put ROBINHOOD_WETH_ADDRESS
+wrangler secret put ROBINHOOD_STABLE_TOKEN_ADDRESS
+wrangler secret put ROBINHOOD_STABLE_SYMBOL
 wrangler secret put EAGLE_SYNC_CHUNK_SIZE
 wrangler secret put EAGLE_SYNC_MAX_CHUNKS_PER_RUN
 wrangler secret put TOKEN_SYNC_COOLDOWN_MS
@@ -47,8 +53,6 @@ Optional:
 ```bash
 wrangler secret put REDIS_URL
 wrangler secret put EAGLE_SYNC_BLOCK_WINDOW
-wrangler secret put ROBINHOOD_FACTORY_ADDRESS
-wrangler secret put ROBINHOOD_FACTORY_START_BLOCK
 wrangler secret put UNISWAP_QUOTE_URL
 ```
 
@@ -62,10 +66,16 @@ EAGLE_SYNC_MAX_CHUNKS_PER_RUN=50
 TOKEN_SYNC_COOLDOWN_MS=30000
 ```
 
-Robinhood Brew / Uni v3 defaults:
+Per-chain defaults:
 
 ```text
-ROBINHOOD_RPC_URL=https://rpc.mainnet.chain.robinhood.com
+BSC_RPC_URL=https://bsc-dataseed.bnbchain.org
+EAGLE_FACTORY_ADDRESS=0xEfca26BAc433975a27E894eeD196C8a1D32c4beE
+
+BASE_RPC_URL=https://mainnet.base.org
+BASE_FACTORY_ADDRESS=0xEfca26BAc433975a27E894eeD196C8a1D32c4beE
+
+ROBINHOOD_RPC_URL=https://robinhood.drpc.org
 ROBINHOOD_FACTORY_ADDRESS=0xA1821b220716cE0bADb708Cd7A507D791f83437a
 ROBINHOOD_FACTORY_START_BLOCK=61867248
 ROBINHOOD_WETH_ADDRESS=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73
@@ -110,8 +120,9 @@ npm run deploy:worker
 ## Notes
 
 - D1 is the primary Workers storage target for `tokens` and `sync_state`.
-- `GET /api/tokens`, `GET /api/tokens/:address`, `GET /api/tokens/sync-status`, and `POST /api/tokens/sync` now accept `?chain=bsc|base`.
-- `POST /api/swap/quote`, `POST /api/swap/check-approval`, and `POST /api/swap/build` are legacy Robinhood Uni routes and are not part of the Brew launch flow.
+- `GET /api/tokens`, `GET /api/tokens/:address`, `GET /api/tokens/sync-status`, and `POST /api/tokens/sync` accept `?chain=bsc|base|robinhood`.
+- BSC and Base use the shared Brew deployment trio `0xEfca... / 0x01ec... / 0x5BD1...`; Robinhood uses the Uni v3-backed Brew deployment `0xA182... / 0xf14B... / 0xaE62...`.
+- `POST /api/swap/quote`, `POST /api/swap/check-approval`, and `POST /api/swap/build` are swap helper routes. Robinhood now uses the Brew launch flow plus Uni v3 market infrastructure.
 - Redis is intentionally disabled in the Workers runtime in the current implementation.
 - MongoDB is still used, but the runtime uses smaller pool and timeout settings to reduce Workers-side connection pressure.
 - If `GET /api/tokens/sync-status` stays at zeroes after deploy, trigger:

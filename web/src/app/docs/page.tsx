@@ -2,12 +2,64 @@ import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { MarketHeader } from '@/components/market-header';
 import { getMarketOverview } from '@/lib/api';
-import { normalizeChainKey, withLangAndChain } from '@/lib/chains';
+import { normalizeChainKey, withLangAndChain, type ChainKey } from '@/lib/chains';
 import { normalizeLang, t, withLang, type Lang } from '@/lib/i18n';
 
-function getDocsContent(lang: Lang) {
+function getDocsContent(lang: Lang, chainKey: ChainKey) {
+  const isBsc = chainKey === 'bsc';
+  const isBase = chainKey === 'base';
+  const chainNameEn = isBsc ? 'BNB Smart Chain' : isBase ? 'Base' : 'Robinhood';
+  const chainNameZh = isBsc ? 'BNB Smart Chain' : isBase ? 'Base' : 'Robinhood';
+  const chainNameJa = isBsc ? 'BNB Smart Chain' : isBase ? 'Base' : 'Robinhood';
+  const chainId = isBsc ? '56' : isBase ? '8453' : '4663';
+  const launchVenueEn = isBsc || isBase ? 'PancakeSwap V3' : 'Uni v3';
+  const launchVenueZh = isBsc || isBase ? 'PancakeSwap V3' : 'Uni v3';
+  const launchVenueJa = isBsc || isBase ? 'PancakeSwap V3' : 'Uni v3';
+  const nativeSymbol = isBsc ? 'BNB' : 'ETH';
+  const wrappedNativeName = isBsc ? 'Wrapped BNB' : 'WETH';
+  const stableSymbol = isBsc ? 'USDT' : isBase ? 'USDC' : 'USDG';
+  const explorerName = isBsc ? 'BscScan' : isBase ? 'Basescan' : 'Blockscout';
+  const anyTokenLabelEn = isBsc ? 'Any BSC token' : isBase ? 'Any Base token' : 'Any Robinhood token';
+  const anyTokenLabelZh = anyTokenLabelEn;
+  const anyTokenLabelJa = anyTokenLabelEn;
+  const contracts =
+    chainKey === 'robinhood'
+      ? ([
+          ['EagleFactory', '0xA1821b220716cE0bADb708Cd7A507D791f83437a'],
+          ['EagleLiquidityLocker', '0xf14Bc7e40Db50D5655957EFE87cB6f20d11AE872'],
+          ['EagleDistributorFactory', '0xaE62EE1fb7Db56Db5ef7DeC817E573b3DDE0Af23'],
+          ['Uni V3 Factory', '0x1f7d7550B1b028f7571E69A784071F0205FD2EfA'],
+          ['Position Manager', '0x73991a25C818Bf1f1128dEAaB1492D45638DE0D3'],
+          ['Wrapped ETH', '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73'],
+          ['USDG', '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168'],
+        ] as const)
+      : chainKey === 'base'
+        ? ([
+            ['EagleFactory', '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE'],
+            ['EagleLiquidityLocker', '0x01ec131cF83F2978780D969b79f4839090618187'],
+            ['EagleDistributorFactory', '0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726'],
+            ['PancakeSwap V3 Factory', '0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865'],
+            ['Position Manager', '0x46A15B0b27311cedF172AB29E4f4766fbE7F4364'],
+            ['Smart Router', '0x678Aa4bF4E210cf2166753e054d5b7c31cc7fa86'],
+            ['Quoter V2', '0x3d146FcE6c1006857750cBe8aF44f76a28041CCc'],
+            ['Wrapped ETH', '0x4200000000000000000000000000000000000006'],
+            ['USDC', '0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913'],
+          ] as const)
+        : ([
+            ['EagleFactory', '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE'],
+            ['EagleLiquidityLocker', '0x01ec131cF83F2978780D969b79f4839090618187'],
+            ['EagleDistributorFactory', '0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726'],
+            ['PancakeSwap V3 Factory', '0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865'],
+            ['Position Manager', '0x46A15B0b27311cedF172AB29E4f4766fbE7F4364'],
+            ['Smart Router', '0x13f4EA83D0bd40E75C8222255bc855a974568Dd4'],
+            ['Quoter V2', '0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997'],
+            ['Wrapped BNB', '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'],
+            ['USDT', '0x55d398326f99059fF775485246999027B3197955'],
+          ] as const);
+
   if (lang === 'zh') {
     return {
+      heroEyebrow: `${chainNameZh} · Mainnet`,
       navItems: [
         ['#getting-started', '创建代币'],
         ['#pairing', '选择交易对'],
@@ -21,12 +73,12 @@ function getDocsContent(lang: Lang) {
           id: 'getting-started',
           index: '01',
           title: '创建代币',
-          body: 'Eagle 会把你的代币直接发射到 BSC 上的 PancakeSwap V3 池子。创建确认并完成索引后，代币会出现在 Explore，并拥有自己的详情页。',
+          body: `Eagle 会把你的代币直接发射到 ${chainNameZh} 上的 ${launchVenueZh} 池子。创建确认并完成索引后，代币会出现在 Explore，并拥有自己的详情页。`,
           steps: [
             '做出你的风格：添加名称、Ticker 和图片。Ticker 会保留你的大小写。再补充描述和社区链接，方便大家找到你。',
-            '选择交易资产：可选 BNB、USDT 或其他兼容的 BSC 代币，它会成为你的配对资产。',
+            `选择交易资产：可选 ${nativeSymbol}、${stableSymbol} 或其他兼容的 ${chainNameZh} 代币，它会成为你的配对资产。`,
             '设置发射参数：选择创作者费用去向，也可以用配对资产添加一笔可选首购。',
-            '连接并发射：连接钱包，切到 BSC，确认发射信息，并预留足够 BNB 作为链上手续费。',
+            `连接并发射：连接钱包，切到 ${chainNameZh}，确认发射信息，并预留足够 ${nativeSymbol} 作为链上手续费。`,
           ],
           notes: ['初始供应量：1,000,000,000 枚 · 18 位小数', '池子交易费：1%', '发射流动性：永久锁定在 Eagle locker'],
         },
@@ -34,19 +86,19 @@ function getDocsContent(lang: Lang) {
           id: 'pairing',
           index: '02',
           title: '选择交易对',
-          body: '交易对是你的代币用来交易的另一种资产。你可以从热门 BSC 代币里选择、按名称或 Ticker 搜索，或者在 Any BSC token 中直接粘贴完整合约地址。',
+          body: `交易对是你的代币用来交易的另一种资产。你可以从热门 ${chainNameZh} 代币里选择、按名称或 Ticker 搜索，或者在 ${anyTokenLabelZh} 中直接粘贴完整合约地址。`,
           steps: [
-            'BNB：使用 BSC 原生币，池子内部会采用 Wrapped BNB。',
-            'USDT：USDT 选项对应的是 BNB Smart Chain 上的 Binance-Peg BSC-USD。',
-            '社区代币：也可以与兼容的 meme 币、普通代币或 BSC 上发行的股票映射代币配对。',
+            `${nativeSymbol}：使用 ${chainNameZh} 原生币，池子内部会采用 ${wrappedNativeName}。`,
+            `${stableSymbol}：${stableSymbol} 选项对应当前 ${chainNameZh} 默认稳定币。`,
+            `社区代币：也可以与兼容的 meme 币、普通代币或 ${chainNameZh} 上发行的资产配对。`,
           ],
         },
         {
           id: 'trading',
           index: '03',
           title: '探索与交易',
-          body: '从 Explore 打开任意代币，可以看到图表、最新成交、持有人和右侧 swap 面板。每条活动记录都可以跳转到 BscScan。',
-          steps: ['可以用配对资产或 BNB 买入。', '报价会跟随交易刷新，开始交易和授权之后 Eagle 都会重新获取最新报价。'],
+          body: `从 Explore 打开任意代币，可以看到图表、最新成交、持有人和右侧 swap 面板。每条活动记录都可以跳转到 ${explorerName}。`,
+          steps: [`可以用配对资产或 ${nativeSymbol} 买入。`, '报价会跟随交易刷新，开始交易和授权之后 Eagle 都会重新获取最新报价。'],
         },
         {
           id: 'fees',
@@ -59,17 +111,8 @@ function getDocsContent(lang: Lang) {
           id: 'contracts',
           index: '05',
           title: '合约地址',
-          body: '以下是 Eagle 在 BNB Smart Chain 主网使用的合约地址，Chain ID 56。你可以复制地址或直接在 BscScan 打开。',
-          contracts: [
-            ['EagleFactory', '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE'],
-            ['EagleLiquidityLocker', '0x01ec131cF83F2978780D969b79f4839090618187'],
-            ['EagleDistributorFactory', '0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726'],
-            ['PancakeSwap V3 Factory', '0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865'],
-            ['Position Manager', '0x46A15B0b27311cedF172AB29E4f4766fbE7F4364'],
-            ['Smart Router', '0x13f4EA83D0bd40E75C8222255bc855a974568Dd4'],
-            ['Quoter V2', '0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997'],
-            ['Wrapped BNB', '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'],
-          ],
+          body: `以下是 Eagle 在 ${chainNameZh} 主网使用的合约地址，Chain ID ${chainId}。你可以复制地址或直接在 ${explorerName} 打开。`,
+          contracts,
         },
         {
           id: 'questions',
@@ -88,6 +131,7 @@ function getDocsContent(lang: Lang) {
 
   if (lang === 'ja') {
     return {
+      heroEyebrow: `${chainNameJa} · Mainnet`,
       navItems: [
         ['#getting-started', 'トークン作成'],
         ['#pairing', 'ペアを選ぶ'],
@@ -101,12 +145,12 @@ function getDocsContent(lang: Lang) {
           id: 'getting-started',
           index: '01',
           title: 'トークン作成',
-          body: 'Eagle はあなたのトークンを BSC 上の PancakeSwap V3 プールへ直接ローンチします。ローンチが確定してインデックスされると、トークンは Explore に表示され、専用ページを持ちます。',
+          body: `Eagle はあなたのトークンを ${chainNameJa} 上の ${launchVenueJa} プールへ直接ローンチします。ローンチが確定してインデックスされると、トークンは Explore に表示され、専用ページを持ちます。`,
           steps: [
             'あなたらしく仕上げる: 名前、ティッカー、画像を追加します。ティッカーは選んだ大文字小文字を維持します。説明文やコミュニティリンクも追加できます。',
-            '取引相手を選ぶ: BNB、USDT、または互換性のある BSC トークンを選択します。これがペア資産になります。',
+            `取引相手を選ぶ: ${nativeSymbol}、${stableSymbol}、または互換性のある ${chainNameJa} トークンを選択します。これがペア資産になります。`,
             'ローンチ設定を決める: クリエイター手数料の受け取り先を選び、必要ならペア資産で初回購入も追加できます。',
-            '接続してローンチ: ウォレットを接続し、BSC に切り替えて内容を確認します。ネットワーク手数料用に BNB を残しておいてください。',
+            `接続してローンチ: ウォレットを接続し、${chainNameJa} に切り替えて内容を確認します。ネットワーク手数料用に ${nativeSymbol} を残しておいてください。`,
           ],
           notes: ['初期供給量: 1,000,000,000 トークン · 18 decimals', 'ローンチプール手数料: 1%', 'ローンチ流動性: Eagle locker に永久ロック'],
         },
@@ -114,19 +158,19 @@ function getDocsContent(lang: Lang) {
           id: 'pairing',
           index: '02',
           title: 'ペアを選ぶ',
-          body: 'ペアはあなたのトークンが取引される相手資産です。人気の BSC トークンから選ぶか、名前やティッカーで検索するか、Any BSC token にコントラクトアドレスを貼り付けられます。',
+          body: `ペアはあなたのトークンが取引される相手資産です。人気の ${chainNameJa} トークンから選ぶか、名前やティッカーで検索するか、${anyTokenLabelJa} にコントラクトアドレスを貼り付けられます。`,
           steps: [
-            'BNB: BSC のネイティブコインです。プール内部では Wrapped BNB が使われます。',
-            'USDT: USDT オプションは BNB Smart Chain 上の Binance-Peg BSC-USD を利用します。',
-            'コミュニティトークン: BSC 上の互換性あるミームコイン、通常のコイン、株式連動トークンとも組み合わせられます。',
+            `${nativeSymbol}: ${chainNameJa} のネイティブコインです。プール内部では ${wrappedNativeName} が使われます。`,
+            `${stableSymbol}: ${chainNameJa} での既定の安定資産です。`,
+            `コミュニティトークン: ${chainNameJa} 上の互換性あるミームコイン、通常のコイン、株式連動トークンとも組み合わせられます。`,
           ],
         },
         {
           id: 'trading',
           index: '03',
           title: '探索と取引',
-          body: 'Explore からトークンを開くと、チャート、最新取引、保有者、swap パネルを確認できます。各アクティビティ行から BscScan を開けます。',
-          steps: ['ペア資産または BNB で購入できます。', '見積もりは取引に合わせて更新され、開始時と承認後に Eagle が再取得します。'],
+          body: `Explore からトークンを開くと、チャート、最新取引、保有者、swap パネルを確認できます。各アクティビティ行から ${explorerName} を開けます。`,
+          steps: [`ペア資産または ${nativeSymbol} で購入できます。`, '見積もりは取引に合わせて更新され、開始時と承認後に Eagle が再取得します。'],
         },
         {
           id: 'fees',
@@ -139,17 +183,8 @@ function getDocsContent(lang: Lang) {
           id: 'contracts',
           index: '05',
           title: 'コントラクト',
-          body: '以下は Eagle が BNB Smart Chain mainnet で使用するコントラクトです。Chain ID は 56。アドレスをコピーするか、BscScan で開けます。',
-          contracts: [
-            ['EagleFactory', '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE'],
-            ['EagleLiquidityLocker', '0x01ec131cF83F2978780D969b79f4839090618187'],
-            ['EagleDistributorFactory', '0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726'],
-            ['PancakeSwap V3 Factory', '0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865'],
-            ['Position Manager', '0x46A15B0b27311cedF172AB29E4f4766fbE7F4364'],
-            ['Smart Router', '0x13f4EA83D0bd40E75C8222255bc855a974568Dd4'],
-            ['Quoter V2', '0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997'],
-            ['Wrapped BNB', '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'],
-          ],
+          body: `以下は Eagle が ${chainNameJa} mainnet で使用するコントラクトです。Chain ID は ${chainId}。アドレスをコピーするか、${explorerName} で開けます。`,
+          contracts,
         },
         {
           id: 'questions',
@@ -167,6 +202,7 @@ function getDocsContent(lang: Lang) {
   }
 
   return {
+    heroEyebrow: `${chainNameEn} · Mainnet`,
     navItems: [
       ['#getting-started', 'Create your token'],
       ['#pairing', 'Choose your pair'],
@@ -180,12 +216,12 @@ function getDocsContent(lang: Lang) {
         id: 'getting-started',
         index: '01',
         title: 'Create your token',
-        body: 'Eagle launches your token directly into a PancakeSwap V3 pool on BSC. Once the launch is confirmed and indexed, your token appears in Explore with its own page.',
+        body: `Eagle launches your token directly into a ${launchVenueEn} pool on ${chainNameEn}. Once the launch is confirmed and indexed, your token appears in Explore with its own page.`,
         steps: [
           'Make it yours: Add a name, ticker and artwork. Tickers keep your chosen capitalization. Add a description and community links so people can find you.',
-          'Choose what it trades with: Select BNB, USDT or another compatible BSC token. This becomes your token’s paired asset.',
+          `Choose what it trades with: Select ${nativeSymbol}, ${stableSymbol} or another compatible ${chainNameEn} token. This becomes your token’s paired asset.`,
           'Set your launch preferences: Choose where creator fees go. You can also make an optional first purchase using the paired asset.',
-          'Connect and launch: Connect your wallet, switch to BSC and confirm the launch details. Keep BNB available for network fees.',
+          `Connect and launch: Connect your wallet, switch to ${chainNameEn} and confirm the launch details. Keep ${nativeSymbol} available for network fees.`,
         ],
         notes: [
           'Initial supply: 1,000,000,000 tokens · 18 decimals',
@@ -197,20 +233,20 @@ function getDocsContent(lang: Lang) {
         id: 'pairing',
         index: '02',
         title: 'Choose your pair',
-        body: 'Your pair is the asset your token trades against. Choose from trending BSC tokens, search by name or ticker, or paste the full contract address into Any BSC token.',
+        body: `Your pair is the asset your token trades against. Choose from trending ${chainNameEn} tokens, search by name or ticker, or paste the full contract address into ${anyTokenLabelEn}.`,
         steps: [
-          'BNB: Use BSC’s native coin. Eagle uses Wrapped BNB inside the pool.',
-          'USDT: The USDT option uses Binance-Peg BSC-USD on BNB Smart Chain.',
-          'Your community’s token: Pair with a compatible memecoin, coin or stock-linked token issued on BSC.',
+          `${nativeSymbol}: Use ${chainNameEn}'s native coin. Eagle uses ${wrappedNativeName} inside the pool.`,
+          `${stableSymbol}: The ${stableSymbol} option uses the default stable asset configured for ${chainNameEn}.`,
+          `Your community’s token: Pair with a compatible memecoin, coin or stock-linked token issued on ${chainNameEn}.`,
         ],
       },
       {
         id: 'trading',
         index: '03',
         title: 'Explore & trade',
-        body: 'Open a token from Explore to see its chart, recent trades, holders and swap panel. Each activity row opens the transaction on BscScan.',
+        body: `Open a token from Explore to see its chart, recent trades, holders and swap panel. Each activity row opens the transaction on ${explorerName}.`,
         steps: [
-          'Buy with the paired token or BNB.',
+          `Buy with the paired token or ${nativeSymbol}.`,
           'Your quote follows the trade. Eagle refreshes the quote when you begin the trade and again after approval.',
         ],
       },
@@ -228,17 +264,8 @@ function getDocsContent(lang: Lang) {
         id: 'contracts',
         index: '05',
         title: 'Contracts',
-        body: 'The contract addresses used by Eagle on BNB Smart Chain mainnet · Chain ID 56. Copy an address or open it on BscScan.',
-        contracts: [
-          ['EagleFactory', '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE'],
-          ['EagleLiquidityLocker', '0x01ec131cF83F2978780D969b79f4839090618187'],
-          ['EagleDistributorFactory', '0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726'],
-          ['PancakeSwap V3 Factory', '0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865'],
-          ['Position Manager', '0x46A15B0b27311cedF172AB29E4f4766fbE7F4364'],
-          ['Smart Router', '0x13f4EA83D0bd40E75C8222255bc855a974568Dd4'],
-          ['Quoter V2', '0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997'],
-          ['Wrapped BNB', '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'],
-        ],
+        body: `The contract addresses used by Eagle on ${chainNameEn} mainnet · Chain ID ${chainId}. Copy an address or open it on ${explorerName}.`,
+        contracts,
       },
       {
         id: 'questions',
@@ -264,7 +291,7 @@ export default async function DocsPage({ searchParams }: DocsPageProps) {
   const lang = normalizeLang(params.lang);
   const chainKey = normalizeChainKey(params.chain);
   const overview = await getMarketOverview(chainKey);
-  const { navItems, sections } = getDocsContent(lang);
+  const { heroEyebrow, navItems, sections } = getDocsContent(lang, chainKey);
 
   return (
     <div className='min-h-screen bg-[#151714]'>
@@ -279,7 +306,7 @@ export default async function DocsPage({ searchParams }: DocsPageProps) {
         </nav>
 
         <section className='rounded-[28px] border border-white/8 bg-[#1a1c19]/96 p-5.5'>
-          <p className='text-[13px] text-[#8f9482]'>{t(lang, 'bnbChain')} · Mainnet</p>
+          <p className='text-[13px] text-[#8f9482]'>{heroEyebrow}</p>
           <h1 className='mt-3 text-[2.6rem] font-semibold tracking-[-0.06em] text-[#f3f1e8]'>{t(lang, 'docsGuidance')}</h1>
           <h2 className='text-[2.2rem] font-semibold tracking-[-0.06em] text-[#f3f1e8]'>{t(lang, 'docsWholeNewToken')}</h2>
           <p className='mt-4 max-w-3xl text-[15px] leading-7 text-[#a8ad99]'>

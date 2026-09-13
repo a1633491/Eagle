@@ -1,27 +1,49 @@
 ## Eagle Web
 
-Frontend for the Eagle market, launch, and wallet flows.
+Frontend for Eagle market, launch, swap, and wallet flows across BSC, Base, and Robinhood.
 
-### Robinhood envs
+## Supported chains
 
-To expose the Robinhood chain switch in the UI, set at minimum:
+### BSC
+
+- Chain ID: `56`
+- Launch venue: `PancakeSwap V3`
+- Native token: `BNB`
+- Stable token: `USDT`
+- Default factory: `0xEfca26BAc433975a27E894eeD196C8a1D32c4beE`
+
+### Base
+
+- Chain ID: `8453`
+- Launch venue: `PancakeSwap V3`
+- Native token: `ETH`
+- Stable token: `USDC`
+- Default factory: `0xEfca26BAc433975a27E894eeD196C8a1D32c4beE`
+
+### Robinhood
+
+- Chain ID: `4663`
+- Launch venue: `Uni v3`
+- Native token: `ETH`
+- Stable token: `USDG`
+- Default factory: `0xA1821b220716cE0bADb708Cd7A507D791f83437a`
+- Recommended RPC: `https://robinhood.drpc.org`
+
+## Frontend envs
+
+The UI works out of the box for BSC and Base using built-in defaults. For Robinhood, enable the chain switch and override addresses only when needed.
 
 ```bash
 NEXT_PUBLIC_ENABLE_ROBINHOOD_CHAIN=true
 NEXT_PUBLIC_ROBINHOOD_RPC_URL=https://robinhood.drpc.org
 NEXT_PUBLIC_ROBINHOOD_WETH_ADDRESS=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73
-```
-
-Robinhood public RPCs can vary by region. The frontend now prefers `https://robinhood.drpc.org` by default.
-
-For Robinhood launches using the Brew suite on top of Uni v3, these are also recommended:
-
-```bash
 NEXT_PUBLIC_ROBINHOOD_STABLE_TOKEN_ADDRESS=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168
 NEXT_PUBLIC_ROBINHOOD_FACTORY_ADDRESS=0xA1821b220716cE0bADb708Cd7A507D791f83437a
 NEXT_PUBLIC_ROBINHOOD_LOCKER_ADDRESS=0xf14Bc7e40Db50D5655957EFE87cB6f20d11AE872
 NEXT_PUBLIC_ROBINHOOD_DISTRIBUTOR_FACTORY_ADDRESS=0xaE62EE1fb7Db56Db5ef7DeC817E573b3DDE0Af23
 ```
+
+The in-app docs page supports per-chain rendering through `?chain=bsc|base|robinhood`.
 
 ---
 

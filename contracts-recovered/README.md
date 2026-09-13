@@ -80,7 +80,53 @@ This is useful for understanding the locker, but in the deployable Eagle archite
 - Creator share: remains in `claimableFees` and must be claimed manually
 - Holder distributor path: still works, because the distributor is just another creator fee recipient that calls `claimFees`
 
-## Robinhood Brew Quick Start
+## Multi-chain quick start
+
+The active Brew deployment targets are:
+
+- `bsc` -> PancakeSwap V3 infra
+- `base` -> PancakeSwap V3 infra
+- `robinhood` -> Uni v3 infra using the same Brew launch suite
+
+All three chains use the same constructor shape and fee model:
+
+- launch fee: `0.01`
+- protocol LP fee share: `5000` bps
+- treasury / owner: `0x29033EFBFA79351DBE1993c6e664A2104F050Fb5`
+
+### BSC
+
+- RPC env: `BSC_RPC_URL`
+- DEX factory: `0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865`
+- Position manager: `0x46A15B0b27311cedF172AB29E4f4766fbE7F4364`
+- Wrapped native: `0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c`
+- Deploy: `npm run deploy:bsc`
+- Verify: `npm run verify:bsc`
+- Output: `deployments/bsc.json`
+
+Current BSC deployment:
+
+- `EagleFactory`: `0xEfca26BAc433975a27E894eeD196C8a1D32c4beE`
+- `EagleLiquidityLocker`: `0x01ec131cF83F2978780D969b79f4839090618187`
+- `EagleDistributorFactory`: `0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726`
+
+### Base
+
+- RPC env: `BASE_RPC_URL`
+- DEX factory: `0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865`
+- Position manager: `0x46A15B0b27311cedF172AB29E4f4766fbE7F4364`
+- Wrapped native: `0x4200000000000000000000000000000000000006`
+- Deploy: `npm run deploy -- --network base`
+- Verify: `npm run verify -- --network base`
+- Output: `deployments/base.json`
+
+Current Base deployment:
+
+- `EagleFactory`: `0xEfca26BAc433975a27E894eeD196C8a1D32c4beE`
+- `EagleLiquidityLocker`: `0x01ec131cF83F2978780D969b79f4839090618187`
+- `EagleDistributorFactory`: `0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726`
+
+### Robinhood Brew Quick Start
 
 Robinhood Chain can deploy the Brew launch suite on top of Uni v3. The deploy script still uses the legacy env names `PANCAKE_V3_FACTORY` and `PANCAKE_POSITION_MANAGER`, but on Robinhood they should point to the Uni v3 contracts below:
 
@@ -106,6 +152,8 @@ Current Robinhood Brew deployment:
 
 ## Robinhood v4 Quick Start
 
+This path is legacy reference only. The active Robinhood production route is the Brew suite on top of Uni v3 from `deployments/robinhood.json`.
+
 For the Robinhood Chain Uni v4 launch suite, add these extra envs on top of the standard owner / treasury / deployer settings:
 
 - `ROBINHOOD_RPC_URL`
@@ -125,13 +173,13 @@ The Robinhood-specific scripts are:
 
 Deployment output is written to `deployments/robinhood-v4.json`.
 
-## Legacy Quick Start
+## Generic setup
 
 1. Copy `.env.example` to `.env`
-2. Fill in your owner, treasury, RPC, deployer key, and `BSCSCAN_API_KEY`
+2. Fill in your owner, treasury, RPC, deployer key, and explorer API key for the target chain
 3. Run `npm install`
 4. Run `npm run compile`
-5. Run `npm run deploy:bsc` or `npm run deploy -- --network base`
-6. Run `npm run verify:bsc` or `npm run verify -- --network base`
+5. Run the deploy command for your chain
+6. Run the matching verify command
 
-Deployment output is written to `deployments/bsc.json`.
+Deployment output is written to `deployments/<network>.json`.
