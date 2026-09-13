@@ -73,12 +73,14 @@ const copy = {
     loadingLaunchFee: '正在读取链上创建费，请稍候...',
     metadataTooLarge: '代币资料过长，已超出合约允许的 metadata 长度，请缩短简介或社媒链接。',
     metadataCompacted: '链上 metadata 已自动压缩到合约允许的长度内。',
+    preflightLaunch: '正在检查交易参数和钱包余额...',
     waitingApproval: '等待钱包授权首购资产...',
     switchingNetwork: '正在切换钱包网络...',
     switchNetworkFirst: '请先把钱包切到当前选择的链。',
     approvalSuccess: '授权成功，现在可以发射。',
     waitingLaunch: '等待钱包确认发射交易...',
     launchSuccess: '发射成功，正在跳转到代币详情页。',
+    insufficientNativeForLaunch: '钱包余额不足。Robinhood 首购使用 ETH 时，余额至少要覆盖首购金额以及额外的链上 gas。',
     robinhoodWalletFeesOnly: 'Robinhood 当前仅支持钱包接收创作者费用。',
     robinhoodFirstBuyDisabled: 'Robinhood 首购参数无效，请检查授权、首购金额和最少收到数量。',
     failedPrefix: '交易失败：',
@@ -106,12 +108,15 @@ const copy = {
     loadingLaunchFee: 'Loading the on-chain launch fee...',
     metadataTooLarge: 'Token metadata is too long for the contract. Shorten the description or social links.',
     metadataCompacted: 'On-chain metadata was compacted automatically to satisfy the contract length limit.',
+    preflightLaunch: 'Checking launch parameters and wallet balance...',
     waitingApproval: 'Waiting for wallet approval...',
     switchingNetwork: 'Switching wallet network...',
     switchNetworkFirst: 'Switch your wallet to the selected network first.',
     approvalSuccess: 'Approval confirmed. You can launch now.',
     waitingLaunch: 'Waiting for wallet confirmation...',
     launchSuccess: 'Launch confirmed. Redirecting to token page.',
+    insufficientNativeForLaunch:
+      'Wallet balance is too low. On Robinhood, an ETH first buy must cover both the first-buy value and extra network gas.',
     robinhoodWalletFeesOnly: 'Robinhood currently supports wallet-based creator fees only.',
     robinhoodFirstBuyDisabled: 'Robinhood first-buy parameters are invalid. Check approval, the buy amount, and min tokens out.',
     failedPrefix: 'Transaction failed: ',
@@ -139,12 +144,15 @@ const copy = {
     loadingLaunchFee: 'オンチェーンの作成手数料を読み込んでいます...',
     metadataTooLarge: 'トークンの metadata が長すぎてコントラクト制限を超えています。説明文か SNS リンクを短くしてください。',
     metadataCompacted: 'オンチェーン metadata はコントラクト制限に収まるよう自動で圧縮されました。',
+    preflightLaunch: '取引パラメータとウォレット残高を確認しています...',
     waitingApproval: 'ウォレット承認を待っています...',
     switchingNetwork: 'ウォレットのネットワークを切り替えています...',
     switchNetworkFirst: '先にウォレットを選択中のネットワークへ切り替えてください。',
     approvalSuccess: '承認完了。ローンチできます。',
     waitingLaunch: 'ウォレット確認を待っています...',
     launchSuccess: 'ローンチ完了。トークンページへ移動します。',
+    insufficientNativeForLaunch:
+      'ウォレット残高が不足しています。Robinhood で ETH の初回購入を使う場合、購入額に加えてネットワーク gas も必要です。',
     robinhoodWalletFeesOnly: 'Robinhood では現在、クリエイター手数料の受取先はウォレットのみ対応です。',
     robinhoodFirstBuyDisabled: 'Robinhood の初回購入パラメータが無効です。承認、購入額、最少受取量を確認してください。',
     failedPrefix: '取引失敗: ',
@@ -159,6 +167,18 @@ function normalizeError(error: unknown, prefix: string) {
     return `${prefix}${error.message}`;
   }
   return `${prefix}Unknown error`;
+}
+
+function isInsufficientFundsError(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : JSON.stringify(error);
+
+  const normalized = message.toLowerCase();
+  return normalized.includes('insufficient funds') || normalized.includes('exceeds the balance of the account');
 }
 
 function readAddress(value: unknown): Address | undefined {
@@ -654,7 +674,11 @@ export function LaunchSubmitActions({
       await refetchAllowance();
       setStatus(locale.approvalSuccess);
     } catch (error) {
-      setStatus(normalizeError(error, locale.failedPrefix));
+      if (isInsufficientFundsError(error)) {
+        setStatus(locale.insufficientNativeForLaunch);
+      } else {
+        setStatus(normalizeError(error, locale.failedPrefix));
+      }
     } finally {
       setIsBusy(false);
     }
@@ -677,7 +701,6 @@ export function LaunchSubmitActions({
     }
     try {
       setIsBusy(true);
-      setStatus(locale.waitingLaunch);
       const effectiveLaunchFee = resolvedLaunchFeeWei;
       if (effectiveLaunchFee === undefined) {
         setStatus(locale.loadingLaunchFee);
@@ -702,6 +725,16 @@ export function LaunchSubmitActions({
         },
       ];
       const txValue = effectiveLaunchFee + (pair === 'BNB' ? firstBuyAmount : BigInt(0));
+      setStatus(locale.preflightLaunch);
+      await publicClient.estimateContractGas({
+        account: address as Address,
+        address: contracts.factory,
+        abi: factoryAbi,
+        functionName: 'launch',
+        args: launchArgs,
+        value: txValue,
+      });
+      setStatus(locale.waitingLaunch);
       const hash = await writeContractAsync({
         address: contracts.factory,
         abi: factoryAbi,
