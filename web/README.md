@@ -1,3 +1,35 @@
+## Eagle Web
+
+Frontend for the Eagle market, launch, and wallet flows.
+
+### Robinhood / Uni v4 envs
+
+To expose the Robinhood chain switch in the UI, set at minimum:
+
+```bash
+NEXT_PUBLIC_ENABLE_ROBINHOOD_CHAIN=true
+NEXT_PUBLIC_ROBINHOOD_RPC_URL=https://rpc.mainnet.chain.robinhood.com
+NEXT_PUBLIC_ROBINHOOD_WETH_ADDRESS=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73
+```
+
+For the current preview flow, these are also recommended:
+
+```bash
+NEXT_PUBLIC_ROBINHOOD_STABLE_TOKEN_ADDRESS=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168
+NEXT_PUBLIC_ROBINHOOD_FACTORY_ADDRESS=<optional-placeholder>
+NEXT_PUBLIC_ROBINHOOD_LOCKER_ADDRESS=<optional-placeholder>
+NEXT_PUBLIC_ROBINHOOD_DISTRIBUTOR_FACTORY_ADDRESS=<optional-placeholder>
+NEXT_PUBLIC_ROBINHOOD_V4_POOL_MANAGER=<uniswap-v4-pool-manager>
+NEXT_PUBLIC_ROBINHOOD_V4_UNIVERSAL_ROUTER=<uniswap-v4-router>
+NEXT_PUBLIC_ROBINHOOD_V4_QUOTER=<uniswap-v4-quoter>
+NEXT_PUBLIC_ROBINHOOD_V4_STATE_VIEW=<uniswap-v4-state-view>
+NEXT_PUBLIC_ROBINHOOD_V4_PERMIT2=0x000000000022D473030F116dDEE9F6B43aC78BA3
+```
+
+The Robinhood token detail page now uses the Worker to proxy Uni v4 quote / approval / swap building, so `NEXT_PUBLIC_API_BASE_URL` must point at the Worker deployment.
+
+---
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

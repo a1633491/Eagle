@@ -312,7 +312,7 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
       </section>
       <aside className='min-w-0 space-y-6'>
         <SwapPanel lang={lang} token={liveToken} creatorClaimableText={creatorClaimableText} />
-        <TokenChainActions lang={lang} tokenAddress={token.address} chainKey={chainKey} />
+        {chainKey !== 'robinhood' ? <TokenChainActions lang={lang} tokenAddress={token.address} chainKey={chainKey} /> : null}
         <div className='rounded-[24px] border border-white/8 bg-[#1a1c19]/96 p-4 sm:p-5'>
           <h2 className='text-lg font-semibold text-[#f3f1e8]'>{t(lang, 'tokenDetails')}</h2>
           <div className='mt-4 divide-y divide-white/6 rounded-[18px] border border-white/8 bg-[#131512] text-sm text-[#a8ad99]'>

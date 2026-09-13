@@ -1,7 +1,9 @@
-import { type Address } from 'viem';
-import { base, bsc, type Chain } from 'wagmi/chains';
+import { type Address, type Chain, zeroAddress } from 'viem';
+import { base, bsc } from 'wagmi/chains';
+import { robinhoodChain } from '@/lib/robinhood-v4';
 
-export type ChainKey = 'bsc' | 'base';
+export type ChainKey = 'bsc' | 'base' | 'robinhood';
+export type DexScreenerChainId = 'bsc' | 'base' | 'robinhood';
 
 type FrontendChainConfig = {
   key: ChainKey;
@@ -15,7 +17,7 @@ type FrontendChainConfig = {
   stableSymbol: string;
   stableToken: Address;
   explorerBaseUrl: string;
-  dexscreenerChainId: ChainKey;
+  dexscreenerChainId: DexScreenerChainId;
   docsWebsite: string;
   anyTokenLabel: string;
   factory?: Address;
@@ -35,6 +37,16 @@ const baseLocker = (process.env.NEXT_PUBLIC_BASE_LOCKER_ADDRESS ??
   '0x01ec131cF83F2978780D969b79f4839090618187') as Address;
 const baseDistributorFactory = (process.env.NEXT_PUBLIC_BASE_DISTRIBUTOR_FACTORY_ADDRESS ??
   '0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726') as Address;
+const robinhoodFactory = (process.env.NEXT_PUBLIC_ROBINHOOD_FACTORY_ADDRESS ?? zeroAddress) as Address;
+const robinhoodLocker = (process.env.NEXT_PUBLIC_ROBINHOOD_LOCKER_ADDRESS ?? zeroAddress) as Address;
+const robinhoodDistributorFactory = (process.env.NEXT_PUBLIC_ROBINHOOD_DISTRIBUTOR_FACTORY_ADDRESS ?? zeroAddress) as Address;
+const robinhoodWrappedNativeToken =
+  (process.env.NEXT_PUBLIC_ROBINHOOD_WETH_ADDRESS ?? '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73') as Address;
+const robinhoodStableToken =
+  (process.env.NEXT_PUBLIC_ROBINHOOD_STABLE_TOKEN_ADDRESS ?? '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168') as Address;
+const robinhoodEnabled =
+  process.env.NEXT_PUBLIC_ENABLE_ROBINHOOD_CHAIN === 'true' &&
+  robinhoodWrappedNativeToken !== zeroAddress;
 
 export const chainConfigs: Record<ChainKey, FrontendChainConfig> = {
   bsc: {
@@ -75,14 +87,41 @@ export const chainConfigs: Record<ChainKey, FrontendChainConfig> = {
     locker: baseLocker,
     distributorFactory: baseDistributorFactory,
   },
+  robinhood: {
+    key: 'robinhood',
+    chainId: robinhoodChain.id,
+    name: 'Robinhood',
+    shortName: 'Robinhood',
+    wagmiChain: robinhoodChain,
+    nativeSymbol: 'ETH',
+    wrappedNativeSymbol: 'WETH',
+    wrappedNativeToken: robinhoodWrappedNativeToken,
+    stableSymbol: 'USDG',
+    stableToken: robinhoodStableToken,
+    explorerBaseUrl: 'https://robinhoodchain.blockscout.com',
+    dexscreenerChainId: 'robinhood',
+    docsWebsite: 'https://docs.robinhood.com/chain/',
+    anyTokenLabel: 'Any Robinhood token',
+    factory: robinhoodFactory,
+    locker: robinhoodLocker,
+    distributorFactory: robinhoodDistributorFactory,
+  },
 };
 
 export function normalizeChainKey(value?: string): ChainKey {
+  if (value === 'robinhood' && robinhoodEnabled) {
+    return 'robinhood';
+  }
+
   return value === 'base' ? 'base' : 'bsc';
 }
 
 export function getChainConfig(chainKey: ChainKey) {
   return chainConfigs[chainKey];
+}
+
+export function getSupportedChainKeys(): ChainKey[] {
+  return robinhoodEnabled ? ['bsc', 'base', 'robinhood'] : ['bsc', 'base'];
 }
 
 export function withLangAndChain(href: string, lang: string, chainKey: ChainKey) {

@@ -1,4 +1,5 @@
-export type ChainKey = 'bsc' | 'base';
+export type ChainKey = 'bsc' | 'base' | 'robinhood';
+export type DexScreenerChainId = 'bsc' | 'base' | 'robinhood';
 
 type ServerChainConfig = {
   key: ChainKey;
@@ -7,14 +8,19 @@ type ServerChainConfig = {
   nativeSymbol: string;
   wrappedNativeSymbol: string;
   wrappedNativeToken: string;
+  wrappedNativeTokenEnvKey?: string;
   stableSymbol: string;
+  stableSymbolEnvKey?: string;
   stableToken: string;
+  stableTokenEnvKey?: string;
   explorerBaseUrl: string;
-  dexscreenerChainId: ChainKey;
+  dexscreenerChainId: DexScreenerChainId;
   rpcEnvKey: string;
   factoryEnvKey: string;
   factoryStartBlockEnvKey: string;
+  supportsFactorySync?: boolean;
   defaultFactoryAddress?: string;
+  defaultRpcUrls?: string[];
 };
 
 export const chainConfigs: Record<ChainKey, ServerChainConfig> = {
@@ -32,7 +38,9 @@ export const chainConfigs: Record<ChainKey, ServerChainConfig> = {
     rpcEnvKey: 'BSC_RPC_URL',
     factoryEnvKey: 'EAGLE_FACTORY_ADDRESS',
     factoryStartBlockEnvKey: 'EAGLE_FACTORY_START_BLOCK',
+    supportsFactorySync: true,
     defaultFactoryAddress: '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE',
+    defaultRpcUrls: ['https://bsc-dataseed.bnbchain.org'],
   },
   base: {
     key: 'base',
@@ -48,21 +56,63 @@ export const chainConfigs: Record<ChainKey, ServerChainConfig> = {
     rpcEnvKey: 'BASE_RPC_URL',
     factoryEnvKey: 'BASE_FACTORY_ADDRESS',
     factoryStartBlockEnvKey: 'BASE_FACTORY_START_BLOCK',
+    supportsFactorySync: true,
     defaultFactoryAddress: '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE',
+    defaultRpcUrls: ['https://mainnet.base.org', 'https://base-rpc.publicnode.com'],
+  },
+  robinhood: {
+    key: 'robinhood',
+    chainId: 4663,
+    name: 'Robinhood',
+    nativeSymbol: 'ETH',
+    wrappedNativeSymbol: 'WETH',
+    wrappedNativeToken: '0x0bd7d308f8e1639fab988df18a8011f41eacad73',
+    wrappedNativeTokenEnvKey: 'ROBINHOOD_WETH_ADDRESS',
+    stableSymbol: 'USDG',
+    stableSymbolEnvKey: 'ROBINHOOD_STABLE_SYMBOL',
+    stableToken: '0x5fc5360d0400a0fd4f2af552add042d716f1d168',
+    stableTokenEnvKey: 'ROBINHOOD_STABLE_TOKEN_ADDRESS',
+    explorerBaseUrl: 'https://robinhoodchain.blockscout.com',
+    dexscreenerChainId: 'robinhood',
+    rpcEnvKey: 'ROBINHOOD_RPC_URL',
+    factoryEnvKey: 'ROBINHOOD_FACTORY_ADDRESS',
+    factoryStartBlockEnvKey: 'ROBINHOOD_FACTORY_START_BLOCK',
+    supportsFactorySync: false,
+    defaultRpcUrls: ['https://rpc.mainnet.chain.robinhood.com'],
   },
 };
 
 export function normalizeChainKey(value?: string): ChainKey {
+  if (value === 'robinhood') return 'robinhood';
   return value === 'base' ? 'base' : 'bsc';
 }
 
 export function getChainConfig(chainKey: ChainKey) {
-  return chainConfigs[chainKey];
+  const config = chainConfigs[chainKey];
+  return {
+    ...config,
+    wrappedNativeToken: config.wrappedNativeTokenEnvKey
+      ? (process.env[config.wrappedNativeTokenEnvKey]?.trim().toLowerCase() || config.wrappedNativeToken)
+      : config.wrappedNativeToken,
+    stableSymbol: config.stableSymbolEnvKey ? process.env[config.stableSymbolEnvKey]?.trim() || config.stableSymbol : config.stableSymbol,
+    stableToken: config.stableTokenEnvKey
+      ? (process.env[config.stableTokenEnvKey]?.trim().toLowerCase() || config.stableToken)
+      : config.stableToken,
+  };
 }
 
 export function getConfiguredRpcUrl(chainKey: ChainKey) {
+  return getConfiguredRpcUrls(chainKey)[0];
+}
+
+export function getConfiguredRpcUrls(chainKey: ChainKey) {
   const config = getChainConfig(chainKey);
-  return process.env[config.rpcEnvKey]?.trim();
+  const configured = (process.env[config.rpcEnvKey] ?? '')
+    .split(/[\s,]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return [...new Set([...configured, ...(config.defaultRpcUrls ?? [])])];
 }
 
 export function getConfiguredFactoryAddress(chainKey: ChainKey) {
@@ -78,4 +128,8 @@ export function getConfiguredStartBlock(chainKey: ChainKey) {
 
 export function getFactorySyncStateKey(chainKey: ChainKey) {
   return `factory-launch-sync:${chainKey}`;
+}
+
+export function supportsFactorySync(chainKey: ChainKey) {
+  return Boolean(getChainConfig(chainKey).supportsFactorySync);
 }

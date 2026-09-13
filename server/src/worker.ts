@@ -54,10 +54,19 @@ type WorkerBindings = {
   REDIS_URL?: string;
   BSC_RPC_URL?: string;
   BASE_RPC_URL?: string;
+  ROBINHOOD_RPC_URL?: string;
   EAGLE_FACTORY_ADDRESS?: string;
   BASE_FACTORY_ADDRESS?: string;
+  ROBINHOOD_FACTORY_ADDRESS?: string;
   EAGLE_FACTORY_START_BLOCK?: string;
   BASE_FACTORY_START_BLOCK?: string;
+  ROBINHOOD_FACTORY_START_BLOCK?: string;
+  ROBINHOOD_WETH_ADDRESS?: string;
+  ROBINHOOD_STABLE_SYMBOL?: string;
+  ROBINHOOD_STABLE_TOKEN_ADDRESS?: string;
+  UNISWAP_API_KEY?: string;
+  UNISWAP_QUOTE_URL?: string;
+  UNISWAP_ROUTER_VERSION?: string;
   EAGLE_SYNC_BLOCK_WINDOW?: string;
   EAGLE_SYNC_CHUNK_SIZE?: string;
   EAGLE_SYNC_MAX_CHUNKS_PER_RUN?: string;
@@ -77,6 +86,59 @@ const app = new Hono<{ Bindings: WorkerBindings }>();
 
 const ok = <T>(data: T) => ({ code: 200, msg: 'success', data });
 const fail = (msg: string, code = 400) => ({ code, msg, data: null });
+
+type SwapQuoteRequest = {
+  chainKey?: string;
+  swapper?: string;
+  tokenIn?: string;
+  tokenOut?: string;
+  amount?: string;
+  slippageTolerance?: number;
+};
+
+type SwapBuildRequest = {
+  quote?: Record<string, unknown>;
+};
+
+function getUniswapHeaders(bindings: WorkerBindings) {
+  return {
+    'x-api-key': bindings.UNISWAP_API_KEY?.trim() ?? '',
+    'x-universal-router-version': bindings.UNISWAP_ROUTER_VERSION?.trim() || '2.2.0',
+    'x-permit2-disabled': 'true',
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+}
+
+async function forwardUniswapRequest(
+  bindings: WorkerBindings,
+  endpoint: 'quote' | 'check_approval' | 'swap',
+  body: Record<string, unknown>,
+) {
+  const apiKey = bindings.UNISWAP_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error('Uniswap API key is not configured');
+  }
+
+  const response = await fetch(`${bindings.UNISWAP_QUOTE_URL?.trim()?.replace(/\/quote$/, '') || 'https://trade-api.gateway.uniswap.org/v1'}/${endpoint}`, {
+    method: 'POST',
+    headers: getUniswapHeaders(bindings),
+    body: JSON.stringify(body),
+  });
+
+  const result = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!response.ok) {
+    const message =
+      (typeof result?.detail === 'string' && result.detail) ||
+      (typeof result?.errorCode === 'string' && result.errorCode) ||
+      `Failed to ${endpoint.replace('_', ' ')}`;
+    const error = new Error(message) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
+
+  return result;
+}
 
 function applyBindings(bindings: WorkerBindings) {
   process.env.WORKER_RUNTIME = 'cloudflare';
@@ -170,6 +232,88 @@ app.post('/api/tokens/register', async (c) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to register token';
     return c.json(fail(message), 400);
+  }
+});
+
+app.post('/api/swap/quote', async (c) => {
+  try {
+    const payload = await c.req.json<SwapQuoteRequest>();
+    const chainKey = normalizeChainKey(payload.chainKey);
+    if (chainKey !== 'robinhood') {
+      return c.json(fail('Only Robinhood Uni v4 quotes are enabled right now'));
+    }
+
+    if (!payload.swapper || !payload.tokenIn || !payload.tokenOut || !payload.amount) {
+      return c.json(fail('Missing swap quote fields'));
+    }
+
+    const chain = getChainConfig(chainKey);
+    const result = await forwardUniswapRequest(c.env, 'quote', {
+      type: 'EXACT_INPUT',
+      tokenIn: payload.tokenIn,
+      tokenOut: payload.tokenOut,
+      tokenInChainId: chain.chainId,
+      tokenOutChainId: chain.chainId,
+      amount: payload.amount,
+      swapper: payload.swapper,
+      slippageTolerance: payload.slippageTolerance ?? 0.5,
+      protocols: ['V4'],
+    });
+    return c.json(ok(result));
+  } catch (error) {
+    const status = error instanceof Error && 'status' in error && typeof error.status === 'number' ? error.status : 500;
+    const message = error instanceof Error ? error.message : 'Failed to fetch swap quote';
+    return c.json(fail(message, status), status as 400 | 404 | 429 | 500 | 501);
+  }
+});
+
+app.post('/api/swap/check-approval', async (c) => {
+  try {
+    const payload = await c.req.json<SwapQuoteRequest>();
+    const chainKey = normalizeChainKey(payload.chainKey);
+    if (chainKey !== 'robinhood') {
+      return c.json(fail('Only Robinhood Uni v4 approvals are enabled right now'));
+    }
+
+    if (!payload.swapper || !payload.tokenIn || !payload.amount) {
+      return c.json(fail('Missing approval fields'));
+    }
+
+    const chain = getChainConfig(chainKey);
+    const result = await forwardUniswapRequest(c.env, 'check_approval', {
+      walletAddress: payload.swapper,
+      token: payload.tokenIn,
+      amount: payload.amount,
+      chainId: chain.chainId,
+      tokenOut: payload.tokenOut,
+      tokenOutChainId: chain.chainId,
+      includeGasInfo: true,
+    });
+    return c.json(ok(result));
+  } catch (error) {
+    const status = error instanceof Error && 'status' in error && typeof error.status === 'number' ? error.status : 500;
+    const message = error instanceof Error ? error.message : 'Failed to check swap approval';
+    return c.json(fail(message, status), status as 400 | 404 | 429 | 500 | 501);
+  }
+});
+
+app.post('/api/swap/build', async (c) => {
+  try {
+    const payload = await c.req.json<SwapBuildRequest>();
+    if (!payload.quote) {
+      return c.json(fail('Missing quote payload'));
+    }
+
+    const result = await forwardUniswapRequest(c.env, 'swap', {
+      quote: payload.quote,
+      refreshGasPrice: true,
+      simulateTransaction: true,
+    });
+    return c.json(ok(result));
+  } catch (error) {
+    const status = error instanceof Error && 'status' in error && typeof error.status === 'number' ? error.status : 500;
+    const message = error instanceof Error ? error.message : 'Failed to build swap transaction';
+    return c.json(fail(message, status), status as 400 | 404 | 429 | 500 | 501);
   }
 });
 

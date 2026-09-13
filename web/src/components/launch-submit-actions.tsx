@@ -75,8 +75,9 @@ const copy = {
     approvalSuccess: '授权成功，现在可以发射。',
     waitingLaunch: '等待钱包确认发射交易...',
     launchSuccess: '发射成功，正在跳转到代币详情页。',
+    robinhoodLaunchSoon: 'Robinhood 发币将走 Uni v4，当前还在接入中。',
     failedPrefix: '交易失败：',
-    customQuoteHint: '输入 BSC 上的任意标准 BEP20 地址。',
+    customQuoteHint: '输入当前链上的任意标准代币地址。',
   },
   en: {
     connectWallet: 'Connect wallet first',
@@ -103,8 +104,9 @@ const copy = {
     approvalSuccess: 'Approval confirmed. You can launch now.',
     waitingLaunch: 'Waiting for wallet confirmation...',
     launchSuccess: 'Launch confirmed. Redirecting to token page.',
+    robinhoodLaunchSoon: 'Robinhood launches will use Uni v4 and are still being integrated.',
     failedPrefix: 'Transaction failed: ',
-    customQuoteHint: 'Enter any standard BEP20 token address on BSC.',
+    customQuoteHint: 'Enter any standard token address on the selected chain.',
   },
   ja: {
     connectWallet: '先にウォレットを接続',
@@ -131,8 +133,9 @@ const copy = {
     approvalSuccess: '承認完了。ローンチできます。',
     waitingLaunch: 'ウォレット確認を待っています...',
     launchSuccess: 'ローンチ完了。トークンページへ移動します。',
+    robinhoodLaunchSoon: 'Robinhood のローンチは Uni v4 で実装中です。',
     failedPrefix: '取引失敗: ',
-    customQuoteHint: 'BSC 上の標準 BEP20 アドレスを入力してください。',
+    customQuoteHint: '選択中のチェーン上の標準トークンアドレスを入力してください。',
   },
 } as const;
 
@@ -311,6 +314,7 @@ export function LaunchSubmitActions({
   const locale = copy[lang];
   const chain = getChainConfig(chainKey);
   const contracts = getEagleContracts(chainKey);
+  const isRobinhoodPreview = chainKey === 'robinhood';
   const router = useRouter();
   const publicClient = usePublicClient();
   const { address, isConnected, chainId: walletChainId } = useAccount();
@@ -502,6 +506,7 @@ export function LaunchSubmitActions({
 
   const formReady =
     isConnected &&
+    !isRobinhoodPreview &&
     Boolean(address) &&
     Boolean(contracts.factory) &&
     Boolean(contracts.distributorFactory) &&
@@ -680,13 +685,15 @@ export function LaunchSubmitActions({
 
   const primaryLabel = !isConnected
     ? locale.connectWallet
+    : isRobinhoodPreview
+      ? 'Uni v4 Soon'
     : isWrongNetwork
       ? `${locale.switchNetwork} ${chain.name}`
     : !approvalSatisfied
       ? locale.approveFirstBuy
       : locale.launchNow;
 
-  const primaryAction = isWrongNetwork ? handleSwitchNetwork : approvalSatisfied ? handleLaunch : handleApprove;
+  const primaryAction = isRobinhoodPreview ? (() => undefined) : isWrongNetwork ? handleSwitchNetwork : approvalSatisfied ? handleLaunch : handleApprove;
   const launchFeeText = formatEther(launchFeeWei ?? defaultLaunchConfig.maxLaunchFeeWeiFallback);
   const firstBuyText = firstBuyAmount !== undefined ? formatUnits(firstBuyAmount, quoteDecimals) : '0';
 
@@ -725,6 +732,8 @@ export function LaunchSubmitActions({
       <p className='text-sm leading-7 text-[#8f9482]'>
         {!isConnected
           ? locale.walletRequired
+          : isRobinhoodPreview
+            ? locale.robinhoodLaunchSoon
           : isWrongNetwork
             ? locale.switchNetworkFirst
           : !name.trim() || !ticker.trim() || !resolvedQuoteToken || firstBuyAmount === undefined
@@ -746,7 +755,7 @@ export function LaunchSubmitActions({
         <button
           type='button'
           onClick={primaryAction}
-          disabled={!(approvalSatisfied ? canLaunch : canApprove) || isBusy}
+          disabled={isRobinhoodPreview || !(approvalSatisfied ? canLaunch : canApprove) || isBusy}
           className='inline-flex h-11 items-center rounded-full border border-[#f6e3ac66] bg-[linear-gradient(145deg,#f7e8ba,#d1b773)] px-5 text-sm font-medium text-[#342d1a] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60'
         >
           {isBusy ? '...' : primaryLabel}

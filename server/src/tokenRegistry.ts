@@ -4,10 +4,11 @@ import { createPublicClient, getAddress, http, isAddress, parseAbiItem } from 'v
 import {
   getChainConfig,
   getConfiguredFactoryAddress,
-  getConfiguredRpcUrl,
+  getConfiguredRpcUrls,
   getConfiguredStartBlock,
   getFactorySyncStateKey,
   normalizeChainKey,
+  supportsFactorySync,
   type ChainKey,
 } from './chainConfig.js';
 
@@ -284,7 +285,7 @@ const tokenTradeSchema = new Schema<TokenTrade>(
 
 const storedTokenSchema = new Schema<StoredTokenDocument>(
   {
-    chainKey: { type: String, enum: ['bsc', 'base'], required: true, default: 'bsc', index: true },
+    chainKey: { type: String, enum: ['bsc', 'base', 'robinhood'], required: true, default: 'bsc', index: true },
     chainId: { type: Number, required: true, default: 56 },
     address: { type: String, required: true, index: true },
     name: { type: String, required: true },
@@ -322,7 +323,7 @@ const StoredTokenModel =
 const storedSyncStateSchema = new Schema<StoredSyncStateDocument>(
   {
     key: { type: String, required: true, unique: true, index: true },
-    chainKey: { type: String, enum: ['bsc', 'base'], required: true, default: 'bsc', index: true },
+    chainKey: { type: String, enum: ['bsc', 'base', 'robinhood'], required: true, default: 'bsc', index: true },
     syncStartedFrom: { type: String, required: true, default: '0' },
     lastSyncedBlock: { type: String, required: true, default: '0' },
     latestKnownBlock: { type: String, required: true, default: '0' },
@@ -794,6 +795,22 @@ function emitDebug(hypothesisId: string, location: string, msg: string, data: Re
       ts: Date.now(),
     }),
   }).catch(() => {});
+}
+
+async function withRpcFallback<T>(rpcUrls: string[], operation: (client: ReturnType<typeof createPublicClient>) => Promise<T>) {
+  const errors: string[] = [];
+
+  for (const rpcUrl of rpcUrls) {
+    try {
+      const client = createPublicClient({ transport: http(rpcUrl) });
+      return await operation(client);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`${rpcUrl}: ${message}`);
+    }
+  }
+
+  throw new Error(errors.join('\n\n'));
 }
 
 function envNumber(name: string, fallback: number) {
@@ -1296,16 +1313,21 @@ function resolvedFactoryStartBlock(chainKey: ChainKey, latestBlock: bigint) {
 }
 
 async function syncFactoryLaunchesInternal(chainKey: ChainKey, options?: { force?: boolean; reset?: boolean }) {
-  const rpcUrl = getConfiguredRpcUrl(chainKey);
+  if (!supportsFactorySync(chainKey)) {
+    return;
+  }
+
+  const rpcUrls = getConfiguredRpcUrls(chainKey);
   // #region debug-point D:sync-start
   emitDebug('D', 'server/src/tokenRegistry.ts:syncFactoryLaunchesInternal:start', '[DEBUG] Factory sync invoked', {
-    hasRpcUrl: Boolean(rpcUrl),
+    hasRpcUrl: rpcUrls.length > 0,
+    rpcUrlCount: rpcUrls.length,
     chainKey,
     force: Boolean(options?.force),
     reset: Boolean(options?.reset),
   });
   // #endregion
-  if (!rpcUrl) return;
+  if (rpcUrls.length === 0) return;
 
   const now = Date.now();
   if (!options?.force && now - lastFactorySyncAt < envNumber('TOKEN_SYNC_COOLDOWN_MS', DEFAULT_SYNC_COOLDOWN_MS)) {
@@ -1313,8 +1335,7 @@ async function syncFactoryLaunchesInternal(chainKey: ChainKey, options?: { force
   }
   lastFactorySyncAt = now;
 
-  const client = createPublicClient({ transport: http(rpcUrl) });
-  const latestBlock = await client.getBlockNumber();
+  const latestBlock = await withRpcFallback(rpcUrls, async (client) => client.getBlockNumber());
   const startBlock = resolvedFactoryStartBlock(chainKey, latestBlock);
   const chunkSize = envBigInt('EAGLE_SYNC_CHUNK_SIZE', DEFAULT_SYNC_CHUNK_SIZE);
   const maxChunksPerRun = envNumber('EAGLE_SYNC_MAX_CHUNKS_PER_RUN', DEFAULT_SYNC_MAX_CHUNKS_PER_RUN);
@@ -1363,12 +1384,14 @@ async function syncFactoryLaunchesInternal(chainKey: ChainKey, options?: { force
 
     while (cursor <= latestBlock && processedChunks < maxChunksPerRun) {
       const toBlock = cursor + chunkSize - 1n < latestBlock ? cursor + chunkSize - 1n : latestBlock;
-      const logs = await client.getLogs({
-        address: factoryAddress,
-        event: tokenLaunchedEvent,
-        fromBlock: cursor,
-        toBlock,
-      });
+      const logs = await withRpcFallback(rpcUrls, async (client) =>
+        client.getLogs({
+          address: factoryAddress,
+          event: tokenLaunchedEvent,
+          fromBlock: cursor,
+          toBlock,
+        }),
+      );
       // #region debug-point D:sync-chunk
       emitDebug('D', 'server/src/tokenRegistry.ts:syncFactoryLaunchesInternal:chunk', '[DEBUG] Factory sync chunk scanned', {
         fromBlock: cursor.toString(),
@@ -1383,7 +1406,7 @@ async function syncFactoryLaunchesInternal(chainKey: ChainKey, options?: { force
         if (!args.token || !args.creator || !args.quoteToken || !args.pool || !args.name || !args.symbol || args.totalSupply === undefined) {
           continue;
         }
-        const block = await client.getBlock({ blockNumber: log.blockNumber });
+        const block = await withRpcFallback(rpcUrls, async (client) => client.getBlock({ blockNumber: log.blockNumber }));
         await registerTokenLaunch({
           chainKey,
           address: args.token,
@@ -1450,6 +1473,18 @@ export async function syncFactoryLaunches(chainKey: ChainKey = 'bsc', options?: 
 }
 
 export async function getFactorySyncStatus(chainKey: ChainKey = 'bsc') {
+  if (!supportsFactorySync(chainKey)) {
+    return {
+      key: getFactorySyncStateKey(chainKey),
+      syncStartedFrom: '0',
+      lastSyncedBlock: '0',
+      latestKnownBlock: '0',
+      lastSyncStatus: 'idle',
+      lastSyncError: '',
+      updatedAt: new Date(0).toISOString(),
+    } satisfies SyncStatus;
+  }
+
   const state = await readSyncState(chainKey);
   if (!state) {
     return {
@@ -1467,6 +1502,9 @@ export async function getFactorySyncStatus(chainKey: ChainKey = 'bsc') {
 
 export async function forceFactorySync(options?: { reset?: boolean; chainKey?: ChainKey }) {
   const chainKey = normalizeChainKey(options?.chainKey);
+  if (!supportsFactorySync(chainKey)) {
+    return getFactorySyncStatus(chainKey);
+  }
   await syncFactoryLaunches(chainKey, { force: true, reset: options?.reset });
   return getFactorySyncStatus(chainKey);
 }
@@ -1483,7 +1521,10 @@ export function getRuntimeDiagnostics(): RuntimeDiagnostics {
     runtime: isWorkerRuntime() ? 'cloudflare-worker' : 'node',
     hasMongoUri: Boolean(process.env.MONGODB_URI?.trim()),
     hasRedisUrl: Boolean(process.env.REDIS_URL?.trim()),
-    hasRpcUrl: Boolean(process.env.BSC_RPC_URL?.trim()),
+    hasRpcUrl:
+      getConfiguredRpcUrls('bsc').length > 0 ||
+      getConfiguredRpcUrls('base').length > 0 ||
+      getConfiguredRpcUrls('robinhood').length > 0,
     hasWorkerKv: Boolean(getWorkerKvStore()),
     hasWorkerD1: Boolean(getWorkerD1Store()),
     mongoReadyState: mongoose.connection.readyState,

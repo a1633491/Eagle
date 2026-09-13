@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ChevronDown, Search } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { EagleMark } from '@/components/eagle-mark';
-import { getChainConfig, normalizeChainKey, type ChainKey } from '@/lib/chains';
+import { getChainConfig, getSupportedChainKeys, normalizeChainKey, type ChainKey } from '@/lib/chains';
 import { MarketOverview } from '@/lib/types';
 import { WalletStatus } from '@/components/wallet-status';
 import { normalizeLang, t, type Lang } from '@/lib/i18n';
@@ -16,6 +16,7 @@ export function MarketHeader({ overview }: { overview: MarketOverview }) {
   const lang = normalizeLang(searchParams.get('lang') ?? undefined);
   const chainKey = normalizeChainKey(searchParams.get('chain') ?? undefined);
   const chain = getChainConfig(chainKey);
+  const supportedChains = getSupportedChainKeys();
 
   const withLang = (href: string, nextLang = lang) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -55,12 +56,11 @@ export function MarketHeader({ overview }: { overview: MarketOverview }) {
             onChange={(event) => router.push(switchChainHref(event.target.value as ChainKey))}
             className="h-10 min-w-[84px] appearance-none rounded-full bg-transparent pl-3 pr-8 text-[12px] text-[#d2d5c9] outline-none sm:min-w-[96px] sm:pl-3.5 sm:pr-9"
           >
-            <option value="bsc" className="bg-[#151714] text-[#f1e4b7]">
-              BNB Chain
-            </option>
-            <option value="base" className="bg-[#151714] text-[#f1e4b7]">
-              Base
-            </option>
+            {supportedChains.map((key) => (
+              <option key={key} value={key} className="bg-[#151714] text-[#f1e4b7]">
+                {getChainConfig(key).name}
+              </option>
+            ))}
           </select>
           <ChevronDown className="pointer-events-none absolute right-2.5 h-4 w-4 text-[#a5aa99]" />
         </div>

@@ -4,6 +4,7 @@ export type TokenSummary = {
   address: string;
   name: string;
   symbol: string;
+  quoteToken?: string;
   quoteSymbol: string;
   priceUsd: number;
   change24h: number;
@@ -18,6 +19,9 @@ export type TokenSummary = {
   official?: boolean;
   tags: string[];
   metadataURI?: string;
+  imageUrl?: string;
+  feeTier?: number;
+  launchedAt?: string;
   explorerBaseUrl?: string;
 };
 
