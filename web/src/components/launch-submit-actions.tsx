@@ -70,6 +70,8 @@ const copy = {
     imageUploading: '代币头像上传中，请稍候...',
     loadingQuotePrice: '正在根据配对币价格计算默认开盘价...',
     quotePriceUnavailable: '暂时无法获取该配对币价格，当前不能按默认开盘价发射。',
+    metadataTooLarge: '代币资料过长，已超出合约允许的 metadata 长度，请缩短简介或社媒链接。',
+    metadataCompacted: '链上 metadata 已自动压缩到合约允许的长度内。',
     waitingApproval: '等待钱包授权首购资产...',
     switchingNetwork: '正在切换钱包网络...',
     switchNetworkFirst: '请先把钱包切到当前选择的链。',
@@ -100,6 +102,8 @@ const copy = {
     imageUploading: 'Token image is uploading. Please wait...',
     loadingQuotePrice: 'Calculating the default starting price from the quote token...',
     quotePriceUnavailable: 'A usable USD price for this quote token is unavailable right now.',
+    metadataTooLarge: 'Token metadata is too long for the contract. Shorten the description or social links.',
+    metadataCompacted: 'On-chain metadata was compacted automatically to satisfy the contract length limit.',
     waitingApproval: 'Waiting for wallet approval...',
     switchingNetwork: 'Switching wallet network...',
     switchNetworkFirst: 'Switch your wallet to the selected network first.',
@@ -130,6 +134,8 @@ const copy = {
     imageUploading: 'トークン画像をアップロード中です。少々お待ちください。',
     loadingQuotePrice: 'ペアトークン価格からデフォルト開始価格を計算しています...',
     quotePriceUnavailable: 'このペアトークンの価格を取得できないため、現在はローンチできません。',
+    metadataTooLarge: 'トークンの metadata が長すぎてコントラクト制限を超えています。説明文か SNS リンクを短くしてください。',
+    metadataCompacted: 'オンチェーン metadata はコントラクト制限に収まるよう自動で圧縮されました。',
     waitingApproval: 'ウォレット承認を待っています...',
     switchingNetwork: 'ウォレットのネットワークを切り替えています...',
     switchNetworkFirst: '先にウォレットを選択中のネットワークへ切り替えてください。',
@@ -142,6 +148,8 @@ const copy = {
     customQuoteHint: '選択中のチェーン上の標準トークンアドレスを入力してください。',
   },
 } as const;
+
+const MAX_ONCHAIN_METADATA_URI_LENGTH = 2048;
 
 function normalizeError(error: unknown, prefix: string) {
   if (error instanceof Error && error.message) {
@@ -225,6 +233,55 @@ function alignInitialTick(targetTokenUsdPrice: number, quoteTokenUsdPrice: numbe
   const rawTick = Math.log(priceInQuote) / Math.log(1.0001);
   const alignedTick = Math.round(rawTick / tickSpacing) * tickSpacing;
   return Math.max(-887200, Math.min(887200, alignedTick));
+}
+
+function encodeMetadataUri(payload: Record<string, string | undefined>) {
+  const sanitizedPayload = Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => typeof value === 'string' && value.trim().length > 0),
+  );
+  return `data:application/json,${encodeURIComponent(JSON.stringify(sanitizedPayload))}`;
+}
+
+function buildLaunchMetadataUri(input: {
+  name: string;
+  symbol: string;
+  description: string;
+  imageUrl: string;
+  websiteUrl: string;
+  twitterUrl: string;
+  telegramUrl: string;
+}) {
+  const fullMetadataUri = encodeMetadataUri({
+    name: input.name,
+    symbol: input.symbol,
+    description: input.description,
+    image: input.imageUrl,
+    external_url: input.websiteUrl,
+    twitter: input.twitterUrl,
+    telegram: input.telegramUrl,
+  });
+  if (fullMetadataUri.length <= MAX_ONCHAIN_METADATA_URI_LENGTH) {
+    return { metadataUri: fullMetadataUri, compacted: false };
+  }
+
+  const compactMetadataUri = encodeMetadataUri({
+    name: input.name,
+    symbol: input.symbol,
+    image: input.imageUrl,
+  });
+  if (compactMetadataUri.length <= MAX_ONCHAIN_METADATA_URI_LENGTH) {
+    return { metadataUri: compactMetadataUri, compacted: true };
+  }
+
+  const minimalMetadataUri = encodeMetadataUri({
+    name: input.name,
+    symbol: input.symbol,
+  });
+  if (minimalMetadataUri.length <= MAX_ONCHAIN_METADATA_URI_LENGTH) {
+    return { metadataUri: minimalMetadataUri, compacted: true };
+  }
+
+  return { metadataUri: undefined, compacted: true };
 }
 
 async function queueAutomaticVerification(payload: {
@@ -462,18 +519,19 @@ export function LaunchSubmitActions({
 
   const tickAligned = parsedInitialTick !== undefined && parsedInitialTick % tickSpacing === 0;
 
-  const metadataUri = useMemo(() => {
-    const payload = JSON.stringify({
-      name: name.trim(),
-      symbol: ticker.trim(),
-      description: story.trim(),
-      image: imageUrl || undefined,
-      external_url: websiteUrl.trim() || undefined,
-      twitter: twitterUrl.trim() || undefined,
-      telegram: telegramUrl.trim() || undefined,
-    });
-    return `data:application/json,${encodeURIComponent(payload)}`;
-  }, [imageUrl, name, story, ticker, websiteUrl, twitterUrl, telegramUrl]);
+  const { metadataUri, compacted: metadataCompacted } = useMemo(
+    () =>
+      buildLaunchMetadataUri({
+        name: name.trim(),
+        symbol: ticker.trim(),
+        description: story.trim(),
+        imageUrl: imageUrl.trim(),
+        websiteUrl: websiteUrl.trim(),
+        twitterUrl: twitterUrl.trim(),
+        telegramUrl: telegramUrl.trim(),
+      }),
+    [imageUrl, name, story, ticker, websiteUrl, twitterUrl, telegramUrl],
+  );
 
   const readyForPrediction = Boolean(address && name.trim() && ticker.trim());
 
@@ -489,7 +547,7 @@ export function LaunchSubmitActions({
           name.trim(),
           ticker.trim(),
           parsedTotalSupply ?? defaultLaunchConfig.totalSupply,
-          metadataUri,
+          metadataUri ?? '',
         ]
       : undefined,
     query: {
@@ -555,6 +613,7 @@ export function LaunchSubmitActions({
     parsedInitialBuyMinTokensOut !== undefined &&
     !imageUploading &&
     !quotePriceLoading &&
+    Boolean(metadataUri) &&
     !holderFeeUnsupported &&
     !firstBuyUnsupported &&
     tickAligned &&
@@ -609,6 +668,7 @@ export function LaunchSubmitActions({
       parsedTotalSupply === undefined ||
       parsedInitialTick === undefined ||
       parsedInitialBuyMinTokensOut === undefined ||
+      !metadataUri ||
       !tickAligned ||
       !publicClient
       || !contracts.factory
@@ -800,12 +860,17 @@ export function LaunchSubmitActions({
               ? locale.loadingQuotePrice
               : quoteUsdPrice === undefined
                 ? locale.quotePriceUnavailable
+              : !metadataUri
+                ? locale.metadataTooLarge
             : parsedTotalSupply === undefined || parsedInitialTick === undefined || parsedInitialBuyMinTokensOut === undefined || !tickAligned
               ? locale.invalidParams
             : feeTarget === 'holders' && !resolvedPredictedDistributorAddress
               ? locale.holdersPending
               : locale.launchReady}
       </p>
+      {metadataCompacted && metadataUri ? (
+        <p className='text-xs text-[#8f9482]'>{locale.metadataCompacted}</p>
+      ) : null}
       {status ? <p className='text-sm text-[#d8c483]'>{status}</p> : null}
       <div className='flex flex-wrap items-center gap-3'>
         <button
