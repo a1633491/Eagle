@@ -80,9 +80,9 @@ const copy = {
     approvalSuccess: '授权成功，现在可以发射。',
     waitingLaunch: '等待钱包确认发射交易...',
     launchSuccess: '发射成功，正在跳转到代币详情页。',
-    insufficientNativeForLaunch: '钱包余额不足。Robinhood 首购使用 ETH 时，余额至少要覆盖首购金额以及额外的链上 gas。',
-    robinhoodWalletFeesOnly: 'Robinhood 当前仅支持钱包接收创作者费用。',
-    robinhoodFirstBuyDisabled: 'Robinhood 首购参数无效，请检查授权、首购金额和最少收到数量。',
+    insufficientNativeForLaunch: '钱包余额不足。使用当前链原生资产首购时，余额至少要覆盖首购金额以及额外的链上 gas。',
+    robinhoodWalletFeesOnly: '当前链当前仅支持钱包接收创作者费用。',
+    robinhoodFirstBuyDisabled: '当前链首购参数无效，请检查授权、首购金额和最少收到数量。',
     failedPrefix: '交易失败：',
     customQuoteHint: '输入当前链上的任意标准代币地址。',
   },
@@ -116,9 +116,9 @@ const copy = {
     waitingLaunch: 'Waiting for wallet confirmation...',
     launchSuccess: 'Launch confirmed. Redirecting to token page.',
     insufficientNativeForLaunch:
-      'Wallet balance is too low. On Robinhood, an ETH first buy must cover both the first-buy value and extra network gas.',
-    robinhoodWalletFeesOnly: 'Robinhood currently supports wallet-based creator fees only.',
-    robinhoodFirstBuyDisabled: 'Robinhood first-buy parameters are invalid. Check approval, the buy amount, and min tokens out.',
+      'Wallet balance is too low. When the first buy uses the chain native asset, it must cover both the buy value and extra network gas.',
+    robinhoodWalletFeesOnly: 'This chain currently supports wallet-based creator fees only.',
+    robinhoodFirstBuyDisabled: 'The first-buy parameters are invalid for this chain. Check approval, the buy amount, and min tokens out.',
     failedPrefix: 'Transaction failed: ',
     customQuoteHint: 'Enter any standard token address on the selected chain.',
   },
@@ -152,9 +152,9 @@ const copy = {
     waitingLaunch: 'ウォレット確認を待っています...',
     launchSuccess: 'ローンチ完了。トークンページへ移動します。',
     insufficientNativeForLaunch:
-      'ウォレット残高が不足しています。Robinhood で ETH の初回購入を使う場合、購入額に加えてネットワーク gas も必要です。',
-    robinhoodWalletFeesOnly: 'Robinhood では現在、クリエイター手数料の受取先はウォレットのみ対応です。',
-    robinhoodFirstBuyDisabled: 'Robinhood の初回購入パラメータが無効です。承認、購入額、最少受取量を確認してください。',
+      'ウォレット残高が不足しています。チェーンのネイティブ資産で初回購入する場合、購入額に加えてネットワーク gas も必要です。',
+    robinhoodWalletFeesOnly: 'このチェーンでは現在、クリエイター手数料の受取先はウォレットのみ対応です。',
+    robinhoodFirstBuyDisabled: 'このチェーンの初回購入パラメータが無効です。承認、購入額、最少受取量を確認してください。',
     failedPrefix: '取引失敗: ',
     customQuoteHint: '選択中のチェーン上の標準トークンアドレスを入力してください。',
   },
@@ -446,13 +446,13 @@ export function LaunchSubmitActions({
   const resolvedLaunchFeeWei = readBigint(launchFeeWei);
   const launchFeeUnavailable = resolvedLaunchFeeWei === undefined;
 
-  const { data: customQuoteDecimals } = useReadContract({
+  const { data: quoteTokenDecimals } = useReadContract({
     chainId: contracts.chainId,
     address: resolvedQuoteToken,
     abi: eagleErc20Abi,
     functionName: 'decimals',
     query: {
-      enabled: pair === 'ANY' && Boolean(resolvedQuoteToken),
+      enabled: Boolean(resolvedQuoteToken),
     },
   });
 
@@ -466,7 +466,7 @@ export function LaunchSubmitActions({
     },
   });
 
-  const quoteDecimals = pair === 'ANY' ? Number(customQuoteDecimals ?? 18) : 18;
+  const quoteDecimals = Number(quoteTokenDecimals ?? 18);
   const resolvedQuoteSymbol =
     pair === 'BNB'
       ? chain.wrappedNativeSymbol
@@ -474,6 +474,7 @@ export function LaunchSubmitActions({
         ? chain.stableSymbol
         : (customQuoteSymbol ?? 'TOKEN');
   const tickSpacing = tickSpacingByFeeTier[feeTier];
+  const nativeFirstBuyUsesValue = pair === 'BNB' && chain.nativeFirstBuyUsesValue !== false;
 
   useEffect(() => {
     if (!resolvedQuoteToken) {
@@ -592,7 +593,7 @@ export function LaunchSubmitActions({
 
   const holderFeeUnsupported = feeTarget === 'holders' && !supportsHolderDistributor;
   const firstBuyUnsupported = false;
-  const needsApproval = pair !== 'BNB' && Boolean(firstBuyAmount && firstBuyAmount > BigInt(0));
+  const needsApproval = !nativeFirstBuyUsesValue && Boolean(firstBuyAmount && firstBuyAmount > BigInt(0));
 
   const { data: currentAllowance, refetch: refetchAllowance } = useReadContract({
     chainId: contracts.chainId,
@@ -725,7 +726,7 @@ export function LaunchSubmitActions({
           maxLaunchFeeWei: effectiveLaunchFee,
         },
       ];
-      const txValue = effectiveLaunchFee + (pair === 'BNB' ? firstBuyAmount : BigInt(0));
+      const txValue = effectiveLaunchFee + (nativeFirstBuyUsesValue ? firstBuyAmount : BigInt(0));
       setStatus(locale.preflightLaunch);
       await publicClient.estimateContractGas({
         account: address as Address,

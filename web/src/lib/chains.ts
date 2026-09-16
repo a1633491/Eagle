@@ -15,6 +15,7 @@ type FrontendChainConfig = {
   nativeSymbol: string;
   wrappedNativeSymbol: string;
   wrappedNativeToken: Address;
+  nativeFirstBuyUsesValue?: boolean;
   stableSymbol: string;
   stableToken: Address;
   explorerBaseUrl: string;
@@ -75,6 +76,7 @@ export const chainConfigs: Record<ChainKey, FrontendChainConfig> = {
     nativeSymbol: 'BNB',
     wrappedNativeSymbol: 'WBNB',
     wrappedNativeToken: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
+    nativeFirstBuyUsesValue: true,
     stableSymbol: 'USDT',
     stableToken: '0x55d398326f99059fF775485246999027B3197955',
     explorerBaseUrl: 'https://bscscan.com',
@@ -94,6 +96,7 @@ export const chainConfigs: Record<ChainKey, FrontendChainConfig> = {
     nativeSymbol: 'ETH',
     wrappedNativeSymbol: 'WETH',
     wrappedNativeToken: '0x4200000000000000000000000000000000000006',
+    nativeFirstBuyUsesValue: true,
     stableSymbol: 'USDC',
     stableToken: '0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913',
     explorerBaseUrl: 'https://basescan.org',
@@ -113,6 +116,7 @@ export const chainConfigs: Record<ChainKey, FrontendChainConfig> = {
     nativeSymbol: 'ETH',
     wrappedNativeSymbol: 'WETH',
     wrappedNativeToken: robinhoodWrappedNativeToken,
+    nativeFirstBuyUsesValue: true,
     stableSymbol: 'USDG',
     stableToken: robinhoodStableToken,
     explorerBaseUrl: 'https://robinhoodchain.blockscout.com',
@@ -132,6 +136,8 @@ export const chainConfigs: Record<ChainKey, FrontendChainConfig> = {
     nativeSymbol: 'USDC',
     wrappedNativeSymbol: 'USDC',
     wrappedNativeToken: arcWrappedNativeToken,
+    // Arc exposes native USDC through an ERC20 interface and does not support a WETH-style deposit().
+    nativeFirstBuyUsesValue: false,
     stableSymbol: process.env.NEXT_PUBLIC_ARC_STABLE_SYMBOL ?? 'USDC',
     stableToken: arcStableToken,
     explorerBaseUrl: 'https://explorer.arc.io',
