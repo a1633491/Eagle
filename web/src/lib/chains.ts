@@ -1,9 +1,10 @@
 import { type Address, type Chain, zeroAddress } from 'viem';
 import { base, bsc } from 'wagmi/chains';
+import { arcChain } from '@/lib/arc';
 import { robinhoodChain } from '@/lib/robinhood-v4';
 
-export type ChainKey = 'bsc' | 'base' | 'robinhood';
-export type DexScreenerChainId = 'bsc' | 'base' | 'robinhood';
+export type ChainKey = 'bsc' | 'base' | 'robinhood' | 'arc';
+export type DexScreenerChainId = 'bsc' | 'base' | 'robinhood' | 'arc';
 
 type FrontendChainConfig = {
   key: ChainKey;
@@ -47,9 +48,22 @@ const robinhoodWrappedNativeToken =
   (process.env.NEXT_PUBLIC_ROBINHOOD_WETH_ADDRESS ?? '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73') as Address;
 const robinhoodStableToken =
   (process.env.NEXT_PUBLIC_ROBINHOOD_STABLE_TOKEN_ADDRESS ?? '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168') as Address;
+const arcFactory = (process.env.NEXT_PUBLIC_ARC_FACTORY_ADDRESS ??
+  '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE') as Address;
+const arcLocker = (process.env.NEXT_PUBLIC_ARC_LOCKER_ADDRESS ??
+  '0x01ec131cF83F2978780D969b79f4839090618187') as Address;
+const arcDistributorFactory = (process.env.NEXT_PUBLIC_ARC_DISTRIBUTOR_FACTORY_ADDRESS ??
+  '0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726') as Address;
+const arcWrappedNativeToken =
+  (process.env.NEXT_PUBLIC_ARC_WRAPPED_NATIVE_TOKEN_ADDRESS ?? '0x3600000000000000000000000000000000000000') as Address;
+const arcStableToken = (process.env.NEXT_PUBLIC_ARC_STABLE_TOKEN_ADDRESS ?? arcWrappedNativeToken) as Address;
 const robinhoodEnabled =
   process.env.NEXT_PUBLIC_ENABLE_ROBINHOOD_CHAIN === 'true' &&
   robinhoodWrappedNativeToken !== zeroAddress;
+const arcEnabled =
+  process.env.NEXT_PUBLIC_ENABLE_ARC_CHAIN === 'true' &&
+  arcFactory !== zeroAddress &&
+  arcWrappedNativeToken !== zeroAddress;
 
 export const chainConfigs: Record<ChainKey, FrontendChainConfig> = {
   bsc: {
@@ -109,9 +123,32 @@ export const chainConfigs: Record<ChainKey, FrontendChainConfig> = {
     locker: robinhoodLocker,
     distributorFactory: robinhoodDistributorFactory,
   },
+  arc: {
+    key: 'arc',
+    chainId: arcChain.id,
+    name: 'Arc',
+    shortName: 'Arc',
+    wagmiChain: arcChain,
+    nativeSymbol: 'USDC',
+    wrappedNativeSymbol: 'USDC',
+    wrappedNativeToken: arcWrappedNativeToken,
+    stableSymbol: process.env.NEXT_PUBLIC_ARC_STABLE_SYMBOL ?? 'USDC',
+    stableToken: arcStableToken,
+    explorerBaseUrl: 'https://explorer.arc.io',
+    dexscreenerChainId: 'arc',
+    docsWebsite: 'https://docs.arc.io/',
+    anyTokenLabel: 'Any Arc token',
+    factory: arcFactory,
+    locker: arcLocker,
+    distributorFactory: arcDistributorFactory,
+  },
 };
 
 export function normalizeChainKey(value?: string): ChainKey {
+  if (value === 'arc' && arcEnabled) {
+    return 'arc';
+  }
+
   if (value === 'robinhood' && robinhoodEnabled) {
     return 'robinhood';
   }
@@ -124,7 +161,10 @@ export function getChainConfig(chainKey: ChainKey) {
 }
 
 export function getSupportedChainKeys(): ChainKey[] {
-  return robinhoodEnabled ? ['bsc', 'base', 'robinhood'] : ['bsc', 'base'];
+  const supported: ChainKey[] = ['bsc', 'base'];
+  if (robinhoodEnabled) supported.push('robinhood');
+  if (arcEnabled) supported.push('arc');
+  return supported;
 }
 
 export function withLangAndChain(href: string, lang: string, chainKey: ChainKey) {

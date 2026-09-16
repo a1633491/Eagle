@@ -8,7 +8,7 @@ import { isAddress } from 'viem';
 import { LaunchSubmitActions } from '@/components/launch-submit-actions';
 import { getChainConfig, withLangAndChain, type ChainKey } from '@/lib/chains';
 import { eagleErc20Abi } from '@/lib/contracts';
-import { t, withLang, type Lang } from '@/lib/i18n';
+import { t, type Lang } from '@/lib/i18n';
 
 const pairOptions = [
   { key: 'BNB', label: 'BNB', subtitle: 'Native', icon: '◆' },
@@ -195,11 +195,13 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
 
   const locale = copy[lang];
   const feeTargetLabel = feeTarget === 'wallet' ? t(lang, 'feeWallet') : locale.holders;
-  const localizedPairOptions = pairOptions.map((option) => ({
-    ...option,
-    label: option.key === 'ANY' ? chain.anyTokenLabel : option.key === 'BNB' ? chain.nativeSymbol : chain.stableSymbol,
-    subtitle: option.key === 'BNB' ? locale.native : option.key === 'USDT' ? locale.stable : option.subtitle,
-  }));
+  const localizedPairOptions = pairOptions
+    .filter((option) => !(option.key === 'USDT' && chain.stableToken.toLowerCase() === chain.wrappedNativeToken.toLowerCase()))
+    .map((option) => ({
+      ...option,
+      label: option.key === 'ANY' ? chain.anyTokenLabel : option.key === 'BNB' ? chain.nativeSymbol : chain.stableSymbol,
+      subtitle: option.key === 'BNB' ? locale.native : option.key === 'USDT' ? locale.stable : option.subtitle,
+    }));
   const chainMainnetLabel = `${chain.name} mainnet Chain ${chain.chainId}`;
 
   async function uploadImage(file: File) {

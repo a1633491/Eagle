@@ -87,12 +87,16 @@ The active Brew deployment targets are:
 - `bsc` -> PancakeSwap V3 infra
 - `base` -> PancakeSwap V3 infra
 - `robinhood` -> Uni v3 infra using the same Brew launch suite
+- `arc` -> Uni v3 infra using the Robinhood-style Brew launch flow with zero launch fee
 
-All three chains use the same constructor shape and fee model:
+All four chains use the same constructor shape and protocol fee model:
 
-- launch fee: `0.01`
+- default launch fee: `0.01` on BSC / Base / Robinhood
+- Arc launch fee: `0`
 - protocol LP fee share: `5000` bps
 - treasury / owner: `0x29033EFBFA79351DBE1993c6e664A2104F050Fb5`
+
+For Arc, set `LAUNCH_FEE_WEI=0` before deployment so token creation stays fee-free.
 
 ### BSC
 
@@ -149,6 +153,31 @@ Current Robinhood Brew deployment:
 - `EagleLiquidityLocker`: `0x7DF4EE3EF16856cc2A834860558ac72Dea997641`
 - `EagleDistributorFactory`: `0x834BEB67eA63d4246BD6B7D1928b2EBD57838F8c`
 - Factory deployment block: `61971645`
+
+### Arc Brew Quick Start
+
+Arc uses the same Brew launch suite shape as Robinhood, but should be deployed with:
+
+- `ARC_RPC_URL`
+- `PANCAKE_V3_FACTORY=0xf0db7b58379503491d857dB50AC9ece64c653918`
+- `PANCAKE_POSITION_MANAGER=0x39654A85A4C05127f5Fd6ED22CAeC077A0fB1377`
+- `WBNB=0x3600000000000000000000000000000000000000`
+- `LAUNCH_FEE_WEI=0`
+
+The Arc-specific scripts are:
+
+- `npm run deploy:arc`
+- `npm run verify:arc`
+- `npm run set-launch-fee:arc`
+
+Deployment output is written to `deployments/arc.json`.
+
+Current Arc Brew deployment:
+
+- `EagleFactory`: `0xEfca26BAc433975a27E894eeD196C8a1D32c4beE`
+- `EagleLiquidityLocker`: `0x01ec131cF83F2978780D969b79f4839090618187`
+- `EagleDistributorFactory`: `0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726`
+- Factory deployment block: `21177224`
 
 ## Robinhood v4 Quick Start
 

@@ -57,15 +57,21 @@ type WorkerBindings = {
   BSC_RPC_URL?: string;
   BASE_RPC_URL?: string;
   ROBINHOOD_RPC_URL?: string;
+  ARC_RPC_URL?: string;
   EAGLE_FACTORY_ADDRESS?: string;
   BASE_FACTORY_ADDRESS?: string;
   ROBINHOOD_FACTORY_ADDRESS?: string;
+  ARC_FACTORY_ADDRESS?: string;
   EAGLE_FACTORY_START_BLOCK?: string;
   BASE_FACTORY_START_BLOCK?: string;
   ROBINHOOD_FACTORY_START_BLOCK?: string;
+  ARC_FACTORY_START_BLOCK?: string;
   ROBINHOOD_WETH_ADDRESS?: string;
   ROBINHOOD_STABLE_SYMBOL?: string;
   ROBINHOOD_STABLE_TOKEN_ADDRESS?: string;
+  ARC_WRAPPED_NATIVE_TOKEN_ADDRESS?: string;
+  ARC_STABLE_SYMBOL?: string;
+  ARC_STABLE_TOKEN_ADDRESS?: string;
   ROBINHOODSCAN_API_KEY?: string;
   UNISWAP_API_KEY?: string;
   UNISWAP_QUOTE_URL?: string;
@@ -198,6 +204,7 @@ function inferVerifyChainKey(payload: VerifyTokenRequest, bindings: WorkerBindin
   const factoryAddress = payload.factoryAddress?.toLowerCase();
   if (!factoryAddress) return undefined;
   if (bindings.ROBINHOOD_FACTORY_ADDRESS?.toLowerCase() === factoryAddress) return 'robinhood';
+  if (bindings.ARC_FACTORY_ADDRESS?.toLowerCase() === factoryAddress) return 'arc';
   if (bindings.BASE_FACTORY_ADDRESS?.toLowerCase() === factoryAddress) return 'base';
   if (bindings.EAGLE_FACTORY_ADDRESS?.toLowerCase() === factoryAddress) return 'bsc';
   return undefined;
@@ -697,6 +704,12 @@ async function runScheduledSync(bindings: WorkerBindings) {
   applyBindings(bindings);
   await forceFactorySync({ chainKey: 'bsc' });
   await forceFactorySync({ chainKey: 'base' });
+  if (bindings.ROBINHOOD_FACTORY_ADDRESS?.trim()) {
+    await forceFactorySync({ chainKey: 'robinhood' });
+  }
+  if (bindings.ARC_FACTORY_ADDRESS?.trim()) {
+    await forceFactorySync({ chainKey: 'arc' });
+  }
 }
 
 export default {

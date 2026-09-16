@@ -42,6 +42,12 @@ wrangler secret put ROBINHOOD_FACTORY_START_BLOCK
 wrangler secret put ROBINHOOD_WETH_ADDRESS
 wrangler secret put ROBINHOOD_STABLE_TOKEN_ADDRESS
 wrangler secret put ROBINHOOD_STABLE_SYMBOL
+wrangler secret put ARC_RPC_URL
+wrangler secret put ARC_FACTORY_ADDRESS
+wrangler secret put ARC_FACTORY_START_BLOCK
+wrangler secret put ARC_WRAPPED_NATIVE_TOKEN_ADDRESS
+wrangler secret put ARC_STABLE_TOKEN_ADDRESS
+wrangler secret put ARC_STABLE_SYMBOL
 wrangler secret put EAGLE_SYNC_CHUNK_SIZE
 wrangler secret put EAGLE_SYNC_MAX_CHUNKS_PER_RUN
 wrangler secret put TOKEN_SYNC_COOLDOWN_MS
@@ -81,6 +87,13 @@ ROBINHOOD_FACTORY_START_BLOCK=61971645
 ROBINHOOD_WETH_ADDRESS=0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73
 ROBINHOOD_STABLE_TOKEN_ADDRESS=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168
 ROBINHOOD_STABLE_SYMBOL=USDG
+
+ARC_RPC_URL=https://rpc.mainnet.arc.io
+ARC_FACTORY_ADDRESS=0xEfca26BAc433975a27E894eeD196C8a1D32c4beE
+ARC_FACTORY_START_BLOCK=21177224
+ARC_WRAPPED_NATIVE_TOKEN_ADDRESS=0x3600000000000000000000000000000000000000
+ARC_STABLE_TOKEN_ADDRESS=0x3600000000000000000000000000000000000000
+ARC_STABLE_SYMBOL=USDC
 UNISWAP_ROUTER_VERSION=2.2.0
 ```
 
@@ -120,8 +133,9 @@ npm run deploy:worker
 ## Notes
 
 - D1 is the primary Workers storage target for `tokens` and `sync_state`.
-- `GET /api/tokens`, `GET /api/tokens/:address`, `GET /api/tokens/sync-status`, and `POST /api/tokens/sync` accept `?chain=bsc|base|robinhood`.
+- `GET /api/tokens`, `GET /api/tokens/:address`, `GET /api/tokens/sync-status`, and `POST /api/tokens/sync` accept `?chain=bsc|base|robinhood|arc`.
 - BSC and Base use the shared Brew deployment trio `0xEfca... / 0x01ec... / 0x5BD1...`; Robinhood uses the Uni v3-backed Brew deployment `0x3A4C... / 0x7DF4... / 0x834B...`.
+- Arc is wired for the same Uni v3-style Brew launch flow as Robinhood. The current Arc factory trio is `0xEfca... / 0x01ec... / 0x5BD1...`, deployed from block `21177224`.
 - `POST /api/swap/quote`, `POST /api/swap/check-approval`, and `POST /api/swap/build` are swap helper routes. Robinhood now uses the Brew launch flow plus Uni v3 market infrastructure.
 - Redis is intentionally disabled in the Workers runtime in the current implementation.
 - MongoDB is still used, but the runtime uses smaller pool and timeout settings to reduce Workers-side connection pressure.

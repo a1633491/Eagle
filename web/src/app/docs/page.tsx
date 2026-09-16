@@ -2,24 +2,27 @@ import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { MarketHeader } from '@/components/market-header';
 import { getMarketOverview } from '@/lib/api';
-import { normalizeChainKey, withLangAndChain, type ChainKey } from '@/lib/chains';
-import { normalizeLang, t, withLang, type Lang } from '@/lib/i18n';
+import { getChainConfig, normalizeChainKey, withLangAndChain, type ChainKey } from '@/lib/chains';
+import { normalizeLang, t, type Lang } from '@/lib/i18n';
 
 function getDocsContent(lang: Lang, chainKey: ChainKey) {
+  const chain = getChainConfig(chainKey);
   const isBsc = chainKey === 'bsc';
   const isBase = chainKey === 'base';
-  const chainNameEn = isBsc ? 'BNB Smart Chain' : isBase ? 'Base' : 'Robinhood';
-  const chainNameZh = isBsc ? 'BNB Smart Chain' : isBase ? 'Base' : 'Robinhood';
-  const chainNameJa = isBsc ? 'BNB Smart Chain' : isBase ? 'Base' : 'Robinhood';
-  const chainId = isBsc ? '56' : isBase ? '8453' : '4663';
+  const isArc = chainKey === 'arc';
+  const chainNameEn = chain.name;
+  const chainNameZh = chain.name;
+  const chainNameJa = chain.name;
+  const chainId = String(chain.chainId);
   const launchVenueEn = isBsc || isBase ? 'PancakeSwap V3' : 'Uni v3';
   const launchVenueZh = isBsc || isBase ? 'PancakeSwap V3' : 'Uni v3';
   const launchVenueJa = isBsc || isBase ? 'PancakeSwap V3' : 'Uni v3';
-  const nativeSymbol = isBsc ? 'BNB' : 'ETH';
-  const wrappedNativeName = isBsc ? 'Wrapped BNB' : 'WETH';
-  const stableSymbol = isBsc ? 'USDT' : isBase ? 'USDC' : 'USDG';
-  const explorerName = isBsc ? 'BscScan' : isBase ? 'Basescan' : 'Blockscout';
-  const anyTokenLabelEn = isBsc ? 'Any BSC token' : isBase ? 'Any Base token' : 'Any Robinhood token';
+  const nativeSymbol = chain.nativeSymbol;
+  const wrappedNativeName =
+    chain.wrappedNativeSymbol === chain.nativeSymbol ? chain.nativeSymbol : `Wrapped ${chain.nativeSymbol}`;
+  const stableSymbol = chain.stableSymbol;
+  const explorerName = isBsc ? 'BscScan' : isBase ? 'Basescan' : isArc ? 'Arc Explorer' : 'Blockscout';
+  const anyTokenLabelEn = chain.anyTokenLabel;
   const anyTokenLabelZh = anyTokenLabelEn;
   const anyTokenLabelJa = anyTokenLabelEn;
   const contracts =
@@ -45,6 +48,16 @@ function getDocsContent(lang: Lang, chainKey: ChainKey) {
             ['Wrapped ETH', '0x4200000000000000000000000000000000000006'],
             ['USDC', '0x833589fCD6EDB6E08f4c7C32D4f71b54bdA02913'],
           ] as const)
+        : chainKey === 'arc'
+          ? ([
+              ['EagleFactory', chain.factory ?? '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE'],
+              ['EagleLiquidityLocker', chain.locker ?? '0x01ec131cF83F2978780D969b79f4839090618187'],
+              ['EagleDistributorFactory', chain.distributorFactory ?? '0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726'],
+              ['Uni V3 Factory', '0xf0db7b58379503491d857dB50AC9ece64c653918'],
+              ['Position Manager', '0x39654A85A4C05127f5Fd6ED22CAeC077A0fB1377'],
+              ['Arc native USDC', chain.wrappedNativeToken],
+              [chain.stableSymbol, chain.stableToken],
+            ] as const)
         : ([
             ['EagleFactory', '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE'],
             ['EagleLiquidityLocker', '0x01ec131cF83F2978780D969b79f4839090618187'],

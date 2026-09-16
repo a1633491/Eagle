@@ -1,5 +1,5 @@
-export type ChainKey = 'bsc' | 'base' | 'robinhood';
-export type DexScreenerChainId = 'bsc' | 'base' | 'robinhood';
+export type ChainKey = 'bsc' | 'base' | 'robinhood' | 'arc';
+export type DexScreenerChainId = 'bsc' | 'base' | 'robinhood' | 'arc';
 
 type ServerChainConfig = {
   key: ChainKey;
@@ -20,6 +20,7 @@ type ServerChainConfig = {
   factoryStartBlockEnvKey: string;
   supportsFactorySync?: boolean;
   defaultFactoryAddress?: string;
+  defaultFactoryStartBlock?: string;
   defaultRpcUrls?: string[];
 };
 
@@ -79,11 +80,35 @@ export const chainConfigs: Record<ChainKey, ServerChainConfig> = {
     factoryStartBlockEnvKey: 'ROBINHOOD_FACTORY_START_BLOCK',
     supportsFactorySync: true,
     defaultFactoryAddress: '0x3A4CE33bb65b9429465b6EAda2F29C9f7bF0a122',
+    defaultFactoryStartBlock: '61971645',
     defaultRpcUrls: ['https://rpc.mainnet.chain.robinhood.com', 'https://robinhood.drpc.org'],
+  },
+  arc: {
+    key: 'arc',
+    chainId: 5042,
+    name: 'Arc',
+    nativeSymbol: 'USDC',
+    wrappedNativeSymbol: 'USDC',
+    wrappedNativeToken: '0x3600000000000000000000000000000000000000',
+    wrappedNativeTokenEnvKey: 'ARC_WRAPPED_NATIVE_TOKEN_ADDRESS',
+    stableSymbol: 'USDC',
+    stableSymbolEnvKey: 'ARC_STABLE_SYMBOL',
+    stableToken: '0x3600000000000000000000000000000000000000',
+    stableTokenEnvKey: 'ARC_STABLE_TOKEN_ADDRESS',
+    explorerBaseUrl: 'https://explorer.arc.io',
+    dexscreenerChainId: 'arc',
+    rpcEnvKey: 'ARC_RPC_URL',
+    factoryEnvKey: 'ARC_FACTORY_ADDRESS',
+    factoryStartBlockEnvKey: 'ARC_FACTORY_START_BLOCK',
+    supportsFactorySync: true,
+    defaultFactoryAddress: '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE',
+    defaultFactoryStartBlock: '21177224',
+    defaultRpcUrls: ['https://rpc.mainnet.arc.io', 'https://rpc.blockdaemon.mainnet.arc.io'],
   },
 };
 
 export function normalizeChainKey(value?: string): ChainKey {
+  if (value === 'arc') return 'arc';
   if (value === 'robinhood') return 'robinhood';
   return value === 'base' ? 'base' : 'bsc';
 }
@@ -124,7 +149,7 @@ export function getConfiguredFactoryAddress(chainKey: ChainKey) {
 
 export function getConfiguredStartBlock(chainKey: ChainKey) {
   const config = getChainConfig(chainKey);
-  return process.env[config.factoryStartBlockEnvKey]?.trim();
+  return process.env[config.factoryStartBlockEnvKey]?.trim() || config.defaultFactoryStartBlock;
 }
 
 export function getFactorySyncStateKey(chainKey: ChainKey) {

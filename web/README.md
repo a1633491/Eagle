@@ -1,6 +1,6 @@
 ## Eagle Web
 
-Frontend for Eagle market, launch, swap, and wallet flows across BSC, Base, and Robinhood.
+Frontend for Eagle market, launch, swap, and wallet flows across BSC, Base, Robinhood, and Arc.
 
 ## Supported chains
 
@@ -29,9 +29,20 @@ Frontend for Eagle market, launch, swap, and wallet flows across BSC, Base, and 
 - Default factory: `0x3A4CE33bb65b9429465b6EAda2F29C9f7bF0a122`
 - Recommended RPC: `https://robinhood.drpc.org`
 
+### Arc
+
+- Chain ID: `5042`
+- Launch venue: `Uni v3`
+- Native token: `USDC`
+- Stable token: `USDC`
+- Default factory: `0xEfca26BAc433975a27E894eeD196C8a1D32c4beE`
+- Default locker: `0x01ec131cF83F2978780D969b79f4839090618187`
+- Default distributor: `0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726`
+- Recommended RPC: `https://rpc.mainnet.arc.io`
+
 ## Frontend envs
 
-The UI works out of the box for BSC and Base using built-in defaults. For Robinhood, enable the chain switch and override addresses only when needed.
+The UI works out of the box for BSC and Base using built-in defaults. For Robinhood and Arc, enable the chain switch and override addresses only when needed.
 
 ```bash
 NEXT_PUBLIC_ENABLE_ROBINHOOD_CHAIN=true
@@ -41,9 +52,18 @@ NEXT_PUBLIC_ROBINHOOD_STABLE_TOKEN_ADDRESS=0x5fc5360D0400a0Fd4f2af552ADD042D716F
 NEXT_PUBLIC_ROBINHOOD_FACTORY_ADDRESS=0x3A4CE33bb65b9429465b6EAda2F29C9f7bF0a122
 NEXT_PUBLIC_ROBINHOOD_LOCKER_ADDRESS=0x7DF4EE3EF16856cc2A834860558ac72Dea997641
 NEXT_PUBLIC_ROBINHOOD_DISTRIBUTOR_FACTORY_ADDRESS=0x834BEB67eA63d4246BD6B7D1928b2EBD57838F8c
+
+NEXT_PUBLIC_ENABLE_ARC_CHAIN=true
+NEXT_PUBLIC_ARC_RPC_URL=https://rpc.mainnet.arc.io
+NEXT_PUBLIC_ARC_WRAPPED_NATIVE_TOKEN_ADDRESS=0x3600000000000000000000000000000000000000
+NEXT_PUBLIC_ARC_STABLE_TOKEN_ADDRESS=0x3600000000000000000000000000000000000000
+NEXT_PUBLIC_ARC_STABLE_SYMBOL=USDC
+NEXT_PUBLIC_ARC_FACTORY_ADDRESS=0xEfca26BAc433975a27E894eeD196C8a1D32c4beE
+NEXT_PUBLIC_ARC_LOCKER_ADDRESS=0x01ec131cF83F2978780D969b79f4839090618187
+NEXT_PUBLIC_ARC_DISTRIBUTOR_FACTORY_ADDRESS=0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726
 ```
 
-The in-app docs page supports per-chain rendering through `?chain=bsc|base|robinhood`.
+The in-app docs page supports per-chain rendering through `?chain=bsc|base|robinhood|arc`.
 
 ---
 

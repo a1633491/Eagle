@@ -45,12 +45,18 @@ const config = {
       chainId: 4663,
       accounts,
     },
+    arc: {
+      url: process.env.ARC_RPC_URL || '',
+      chainId: 5042,
+      accounts,
+    },
   },
   etherscan: {
     apiKey: {
       bsc: process.env.BSCSCAN_API_KEY || '',
       base: process.env.ETHERSCAN_API_KEY || process.env.BASESCAN_API_KEY || '',
       robinhood: process.env.ROBINHOODSCAN_API_KEY || '',
+      arc: process.env.ARCSCAN_API_KEY || '',
     },
     customChains: [
       {
@@ -67,6 +73,14 @@ const config = {
         urls: {
           apiURL: 'https://robinhoodchain.blockscout.com/api',
           browserURL: 'https://robinhoodchain.blockscout.com',
+        },
+      },
+      {
+        network: 'arc',
+        chainId: 5042,
+        urls: {
+          apiURL: 'https://explorer.arc.io/api',
+          browserURL: 'https://explorer.arc.io',
         },
       },
     ],

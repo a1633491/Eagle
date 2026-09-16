@@ -289,7 +289,7 @@ const tokenTradeSchema = new Schema<TokenTrade>(
 
 const storedTokenSchema = new Schema<StoredTokenDocument>(
   {
-    chainKey: { type: String, enum: ['bsc', 'base', 'robinhood'], required: true, default: 'bsc', index: true },
+    chainKey: { type: String, enum: ['bsc', 'base', 'robinhood', 'arc'], required: true, default: 'bsc', index: true },
     chainId: { type: Number, required: true, default: 56 },
     address: { type: String, required: true, index: true },
     name: { type: String, required: true },
@@ -327,7 +327,7 @@ const StoredTokenModel =
 const storedSyncStateSchema = new Schema<StoredSyncStateDocument>(
   {
     key: { type: String, required: true, unique: true, index: true },
-    chainKey: { type: String, enum: ['bsc', 'base', 'robinhood'], required: true, default: 'bsc', index: true },
+    chainKey: { type: String, enum: ['bsc', 'base', 'robinhood', 'arc'], required: true, default: 'bsc', index: true },
     syncStartedFrom: { type: String, required: true, default: '0' },
     lastSyncedBlock: { type: String, required: true, default: '0' },
     latestKnownBlock: { type: String, required: true, default: '0' },
@@ -1529,7 +1529,8 @@ export function getRuntimeDiagnostics(): RuntimeDiagnostics {
     hasRpcUrl:
       getConfiguredRpcUrls('bsc').length > 0 ||
       getConfiguredRpcUrls('base').length > 0 ||
-      getConfiguredRpcUrls('robinhood').length > 0,
+      getConfiguredRpcUrls('robinhood').length > 0 ||
+      getConfiguredRpcUrls('arc').length > 0,
     hasWorkerKv: Boolean(getWorkerKvStore()),
     hasWorkerD1: Boolean(getWorkerD1Store()),
     mongoReadyState: mongoose.connection.readyState,
