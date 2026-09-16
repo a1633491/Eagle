@@ -251,9 +251,17 @@ async function fetchQuoteUsdPrice(token: Address, chainKey: ChainKey) {
   return bestUsdPrice;
 }
 
-function alignInitialTick(targetTokenUsdPrice: number, quoteTokenUsdPrice: number, tickSpacing: number) {
+function alignInitialTick(
+  targetTokenUsdPrice: number,
+  quoteTokenUsdPrice: number,
+  tickSpacing: number,
+  quoteTokenDecimals: number,
+  tokenDecimals = 18,
+) {
   const priceInQuote = targetTokenUsdPrice / quoteTokenUsdPrice;
-  const rawTick = Math.log(priceInQuote) / Math.log(1.0001);
+  const decimalScale = 10 ** (quoteTokenDecimals - tokenDecimals);
+  const rawPoolPrice = priceInQuote * decimalScale;
+  const rawTick = Math.log(rawPoolPrice) / Math.log(1.0001);
   const alignedTick = Math.round(rawTick / tickSpacing) * tickSpacing;
   return Math.max(-887200, Math.min(887200, alignedTick));
 }
@@ -529,8 +537,8 @@ export function LaunchSubmitActions({
 
   const parsedInitialTick = useMemo(() => {
     if (!quoteUsdPrice || quoteUsdPrice <= 0) return undefined;
-    return alignInitialTick(defaultLaunchConfig.targetLaunchPriceUsd, quoteUsdPrice, tickSpacing);
-  }, [quoteUsdPrice, tickSpacing]);
+    return alignInitialTick(defaultLaunchConfig.targetLaunchPriceUsd, quoteUsdPrice, tickSpacing, quoteDecimals);
+  }, [quoteDecimals, quoteUsdPrice, tickSpacing]);
 
   const parsedInitialBuyMinTokensOut = useMemo(() => {
     try {
