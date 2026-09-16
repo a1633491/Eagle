@@ -327,7 +327,18 @@ async function selectFirstMatchingValue(page: any, selectors: string[], value: s
   return false;
 }
 
-async function submitRobinhoodTokenVerification(bindings: WorkerBindings, payload: Required<VerifyTokenRequest>) {
+function getExplorerVerificationBaseUrl(chainKey: 'robinhood' | 'arc') {
+  if (chainKey === 'arc') {
+    return 'https://explorer.arc.io';
+  }
+
+  return 'https://robinhoodchain.blockscout.com';
+}
+
+async function submitBrowserTokenVerification(
+  bindings: WorkerBindings,
+  payload: Required<VerifyTokenRequest> & { chainKey: 'robinhood' | 'arc' },
+) {
   if (!bindings.BROWSER) {
     throw new Error('Cloudflare Browser binding is not configured');
   }
@@ -346,7 +357,8 @@ async function submitRobinhoodTokenVerification(bindings: WorkerBindings, payloa
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(30_000);
-    const verificationUrl = `https://robinhoodchain.blockscout.com/address/${payload.address}/contract-verification?type=solidity-standard-json-input`;
+    const explorerBaseUrl = getExplorerVerificationBaseUrl(payload.chainKey);
+    const verificationUrl = `${explorerBaseUrl}/address/${payload.address}/contract-verification?type=solidity-standard-json-input`;
 
     await page.goto(verificationUrl, { waitUntil: 'domcontentloaded' });
 
@@ -362,7 +374,7 @@ async function submitRobinhoodTokenVerification(bindings: WorkerBindings, payloa
     const fileInput = page.locator('input[type="file"][name="sources"]').first();
     await fileInput.waitFor({ state: 'attached', timeout: 30_000 });
     await fileInput.setInputFiles({
-      name: 'eagletoken-robinhood-standard-input.json',
+      name: `eagletoken-${payload.chainKey}-standard-input.json`,
       mimeType: 'application/json',
       buffer: Buffer.from(standardJsonInput, 'utf8'),
     });
@@ -660,8 +672,8 @@ app.post('/api/verify-token', async (c) => {
     const payload = (await c.req.json<VerifyTokenRequest>().catch(() => ({}))) as VerifyTokenRequest;
     const chainKey = inferVerifyChainKey(payload, c.env);
 
-    if (chainKey !== 'robinhood') {
-      return c.json(fail('verify-token currently supports Robinhood only on Cloudflare Workers', 501), 501);
+    if (chainKey !== 'robinhood' && chainKey !== 'arc') {
+      return c.json(fail('verify-token currently supports Robinhood and Arc on Cloudflare Workers', 501), 501);
     }
 
     if (
@@ -691,7 +703,11 @@ app.post('/api/verify-token', async (c) => {
       creator: payload.creator,
     };
 
-    c.executionCtx.waitUntil(submitRobinhoodTokenVerification(c.env, jobPayload).catch((error) => console.error('Robinhood verify-token failed', error)));
+    c.executionCtx.waitUntil(
+      submitBrowserTokenVerification(c.env, jobPayload as typeof jobPayload & { chainKey: 'robinhood' | 'arc' }).catch((error) =>
+        console.error(`${chainKey} verify-token failed`, error),
+      ),
+    );
 
     return c.json(ok({ chainKey, status: 'queued' }));
   } catch (error) {
