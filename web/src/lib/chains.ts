@@ -151,6 +151,10 @@ export const chainConfigs: Record<ChainKey, FrontendChainConfig> = {
 };
 
 export function normalizeChainKey(value?: string): ChainKey {
+  if (value === 'bsc') {
+    return 'bsc';
+  }
+
   if (value === 'arc' && arcEnabled) {
     return 'arc';
   }
