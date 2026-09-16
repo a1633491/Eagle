@@ -6,13 +6,13 @@ import { arcChain, arcPublicRpcUrl } from '@/lib/arc';
 import { robinhoodChain, robinhoodPublicRpcUrl } from '@/lib/robinhood-v4';
 
 export const wagmiConfig = createConfig({
-  chains: [bsc, base, robinhoodChain, arcChain],
+  chains: [arcChain, bsc, base, robinhoodChain],
   connectors: [injected()],
   transports: {
+    [arcChain.id]: http(arcPublicRpcUrl),
     [bsc.id]: http(),
     [base.id]: http(),
     [robinhoodChain.id]: http(robinhoodPublicRpcUrl),
-    [arcChain.id]: http(arcPublicRpcUrl),
   },
   ssr: true,
 });

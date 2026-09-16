@@ -159,7 +159,15 @@ export function normalizeChainKey(value?: string): ChainKey {
     return 'robinhood';
   }
 
-  return value === 'base' ? 'base' : 'bsc';
+  if (value === 'base') {
+    return 'base';
+  }
+
+  if (arcEnabled) {
+    return 'arc';
+  }
+
+  return 'bsc';
 }
 
 export function getChainConfig(chainKey: ChainKey) {
@@ -167,9 +175,10 @@ export function getChainConfig(chainKey: ChainKey) {
 }
 
 export function getSupportedChainKeys(): ChainKey[] {
-  const supported: ChainKey[] = ['bsc', 'base'];
-  if (robinhoodEnabled) supported.push('robinhood');
+  const supported: ChainKey[] = [];
   if (arcEnabled) supported.push('arc');
+  supported.push('bsc', 'base');
+  if (robinhoodEnabled) supported.push('robinhood');
   return supported;
 }
 
