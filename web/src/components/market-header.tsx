@@ -47,7 +47,7 @@ export function MarketHeader({ overview }: { overview: MarketOverview }) {
           <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e8d79f2c] bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.14),rgba(255,255,255,0.03)_46%,rgba(10,12,10,0.12)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_8px_rgba(0,0,0,0.14)]">
             <EagleMark className="h-7 w-7" />
           </span>
-          <span className="hidden text-[1.55rem] font-semibold tracking-[-0.07em] min-[380px]:inline">Eagle.</span>
+          <span className="hidden text-[1.55rem] font-semibold tracking-[-0.07em] min-[380px]:inline">zero</span>
         </Link>
         <div className="relative flex h-10 items-center rounded-full border border-white/10 bg-white/[0.04] md:flex">
           <select

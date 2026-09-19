@@ -17,7 +17,7 @@ import { type Lang } from '@/lib/i18n';
 const copy = {
   zh: {
     title: '链上操作',
-    subtitle: '直接调用你刚部署的 Eagle 合约。',
+    subtitle: '直接调用你刚部署的 zero 合约。',
     connectWallet: '先连接钱包',
     launchStatus: '工厂登记状态',
     launched: '已在 EagleFactory 登记',
@@ -40,7 +40,7 @@ const copy = {
   },
   en: {
     title: 'On-chain actions',
-    subtitle: 'Call the live Eagle contracts directly.',
+    subtitle: 'Call the live zero contracts directly.',
     connectWallet: 'Connect wallet first',
     launchStatus: 'Factory registry',
     launched: 'Registered in EagleFactory',
@@ -63,7 +63,7 @@ const copy = {
   },
   ja: {
     title: 'オンチェーン操作',
-    subtitle: 'いま動いている Eagle コントラクトを直接呼び出します。',
+    subtitle: 'いま動いている zero コントラクトを直接呼び出します。',
     connectWallet: '先にウォレットを接続',
     launchStatus: 'Factory 登録状態',
     launched: 'EagleFactory に登録済み',

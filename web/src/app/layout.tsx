@@ -11,8 +11,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'eagle.',
-  description: 'AVE-style encrypted market dashboard clone built with Next.js',
+  title: 'zero',
+  description: '0 = Fair launch / Zero barrier to entry / Issuing tokens from zero',
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
