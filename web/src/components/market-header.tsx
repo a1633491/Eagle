@@ -44,8 +44,8 @@ export function MarketHeader({ overview }: { overview: MarketOverview }) {
     <header className="sticky top-0 z-30 border-b border-white/8 bg-[#151714]/88 backdrop-blur-xl">
       <div className="mx-auto flex h-[62px] w-full max-w-6xl items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:px-6">
         <Link href={withLang('/')} className="flex items-center gap-2.5 text-[#f4eed7]">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#e8d79f2c] bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.14),rgba(255,255,255,0.03)_46%,rgba(10,12,10,0.12)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_8px_rgba(0,0,0,0.14)]">
-            <EagleMark className="h-7 w-7" />
+          <span className="flex h-10 w-10 items-center justify-center rounded-[12px] border border-[#e8d79f2c] bg-[#0f1119] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_8px_rgba(0,0,0,0.14)]">
+            <EagleMark className="h-full w-full" />
           </span>
           <span className="hidden text-[1.55rem] font-semibold tracking-[-0.07em] min-[380px]:inline">zero</span>
         </Link>

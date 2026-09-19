@@ -1,6 +1,6 @@
 export function EagleMark({ className = 'h-6 w-6' }: { className?: string }) {
   return (
-    <svg viewBox="0 0 96 96" className={className} aria-hidden="true">
+    <svg viewBox="-4 -4 104 104" className={className} aria-hidden="true">
       <defs>
         <linearGradient id="logo-shell-stroke" x1="16" y1="10" x2="84" y2="86" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#fbfdff" stopOpacity="0.96" />
