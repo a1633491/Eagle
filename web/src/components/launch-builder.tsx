@@ -377,65 +377,6 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
   const socialReadyText = [websiteUrl, twitterUrl, telegramUrl].filter(Boolean).length
     ? [websiteUrl && locale.websiteLabel, twitterUrl && locale.xLabel, telegramUrl && locale.telegramLabel].filter(Boolean).join(' / ')
     : locale.noLinksYet;
-  const previewPanel = (
-    <section className='rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[34px] sm:p-6'>
-      <div className='mb-5 flex items-start justify-between gap-4'>
-        <div>
-          <p className='text-xs font-medium uppercase tracking-[0.18em] text-[#7f8779]'>{locale.livePreviewPanel}</p>
-          <p className='mt-2 text-sm leading-7 text-[#8e9488]'>{locale.realtimePreview}</p>
-        </div>
-        <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1 text-xs text-[#f1e4b7]'>
-          {t(lang, 'preLaunch')}
-        </span>
-      </div>
-
-      <div className='rounded-[24px] border border-white/8 bg-[#10130f] p-4 sm:rounded-[26px] sm:p-6'>
-        <div className='rounded-[22px] border border-white/8 bg-[radial-gradient(circle_at_bottom,rgba(101,92,255,0.24),rgba(16,19,15,0)_45%),#131712] p-4 sm:rounded-[24px] sm:p-5'>
-          <div className='flex items-start gap-4'>
-            {imagePreviewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={imagePreviewUrl} alt='Token preview' className='h-16 w-16 rounded-[18px] border border-white/10 object-cover sm:h-20 sm:w-20 sm:rounded-[22px]' />
-            ) : (
-              <div className='flex h-16 w-16 items-center justify-center rounded-[18px] border border-white/10 bg-[#191d19] text-[#f1e4b7] sm:h-20 sm:w-20 sm:rounded-[22px]'>
-                <Upload className='h-6 w-6 sm:h-7 sm:w-7' />
-              </div>
-            )}
-            <div className='min-w-0 flex-1'>
-              <div className='text-xs uppercase tracking-[0.18em] text-[#737a6d]'>{locale.previewCardHint}</div>
-              <h3 className='mt-3 truncate text-[1.35rem] font-semibold tracking-[-0.06em] text-[#f3f1e8] sm:text-[1.6rem]'>
-                {name || locale.yourTokenName}
-              </h3>
-              <div className='mt-2 flex flex-wrap items-center gap-2 text-sm text-[#c2c8bd]'>
-                <span>${ticker || 'TICKER'}</span>
-                <span className='text-[#5f665b]'>/</span>
-                <span>{pairLabel}</span>
-              </div>
-            </div>
-          </div>
-
-          <p className='mt-5 min-h-[72px] text-sm leading-7 text-[#8e9488] sm:min-h-[84px]'>
-            {story || locale.previewStory}
-          </p>
-
-          <div className='mt-5 grid gap-3 rounded-[18px] border border-white/8 bg-[#0d0f0d] p-4 text-sm sm:rounded-[20px]'>
-            <InfoRow label={locale.previewPair} value={`$${ticker || 'TICKER'} / ${pairLabel}`} />
-            <InfoRow label={locale.previewChain} value={chain.name} />
-            <InfoRow label={locale.previewStatus} value={t(lang, 'preLaunch')} />
-            <InfoRow label={locale.previewPoolMode} value={poolMode === 'single' ? locale.singlePool : locale.multiPool} />
-          </div>
-
-          <div className='mt-5 flex flex-wrap gap-2 text-xs'>
-            {websiteUrl ? <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#f1e4b7]'>{locale.websiteLabel}</span> : null}
-            {twitterUrl ? <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#f1e4b7]'>{locale.xLabel}</span> : null}
-            {telegramUrl ? <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#f1e4b7]'>{locale.telegramLabel}</span> : null}
-            {!websiteUrl && !twitterUrl && !telegramUrl ? (
-              <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#737a6d]'>{locale.noLinksYet}</span>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -529,12 +470,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
         </div>
       </div>
 
-      <div className='xl:hidden'>
-        {previewPanel}
-      </div>
-
-      <div className='grid gap-6 xl:grid-cols-[minmax(0,58fr)_minmax(360px,42fr)]'>
-        <div className='space-y-6'>
+      <div className='space-y-6'>
           <section className='rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[34px] sm:p-8'>
             <BrewSectionHeading
               step='01'
@@ -919,11 +855,6 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
               />
             </div>
           </section>
-        </div>
-
-        <aside className='hidden min-w-0 xl:sticky xl:top-24 xl:block xl:self-start'>
-          {previewPanel}
-        </aside>
       </div>
     </div>
   );
