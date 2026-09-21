@@ -9,13 +9,13 @@
   "treasury": "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
   "launchFeeWei": "0",
   "protocolLpFeeBps": 5000,
-  "eagleFactory": "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE",
-  "eagleLiquidityLocker": "0x01ec131cF83F2978780D969b79f4839090618187",
-  "eagleDistributorFactory": "0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726",
+  "eagleFactory": "0x9D4417CCb6536e82e39dA1f258C79B2928983760",
+  "eagleLiquidityLocker": "0xb55624004F0D5eb32D09E2d15C4126433052C0D9",
+  "eagleDistributorFactory": "0x5878fBD635e67cae40A3a1ebf9B01D9AC3BB4915",
   "verification": {
     "eagleFactory": {
-      "address": "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE",
-      "contract": "contracts/BrewLaunchSuite.sol:EagleFactory",
+      "address": "0x9D4417CCb6536e82e39dA1f258C79B2928983760",
+      "contract": "contracts/BrewLaunchSuite.sol:ZeroFactory",
       "constructorArguments": [
         "0xf0db7b58379503491d857dB50AC9ece64c653918",
         "0x39654A85A4C05127f5Fd6ED22CAeC077A0fB1377",
@@ -27,18 +27,18 @@
       ]
     },
     "eagleLiquidityLocker": {
-      "address": "0x01ec131cF83F2978780D969b79f4839090618187",
-      "contract": "contracts/BrewLaunchSuite.sol:EagleLiquidityLocker",
+      "address": "0xb55624004F0D5eb32D09E2d15C4126433052C0D9",
+      "contract": "contracts/BrewLaunchSuite.sol:ZeroLiquidityLocker",
       "constructorArguments": [
         "0x39654A85A4C05127f5Fd6ED22CAeC077A0fB1377",
-        "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE"
+        "0x9D4417CCb6536e82e39dA1f258C79B2928983760"
       ]
     },
     "eagleDistributorFactory": {
-      "address": "0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726",
-      "contract": "contracts/BrewLaunchSuite.sol:EagleDistributorFactory",
+      "address": "0x5878fBD635e67cae40A3a1ebf9B01D9AC3BB4915",
+      "contract": "contracts/BrewLaunchSuite.sol:ZeroDistributorFactory",
       "constructorArguments": [
-        "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE"
+        "0x9D4417CCb6536e82e39dA1f258C79B2928983760"
       ]
     }
   }

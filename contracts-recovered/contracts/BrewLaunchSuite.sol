@@ -1548,7 +1548,7 @@ interface IERC1155Errors {
     error ERC1155InvalidArrayLength(uint256 idsLength, uint256 valuesLength);
 }
 
-interface IEagleFeeConfig {
+interface IZeroFeeConfig {
     function treasury() external view returns (address);
 }
 
@@ -1559,17 +1559,13 @@ interface IEagleFeeConfig {
 /// leave, so launch liquidity is provably locked forever.
 ///
 /// The only value that ever exits is accrued swap fees. Anyone may trigger
-/// collection; the pool tax then settles like this:
-///   - the LAUNCHED-token side of the fees is BURNED in full — neither the
-///     creator nor the protocol ever holds or sells a token launched through
-///     Eagle, and every sell permanently deflates the supply;
-///   - the QUOTE (paired token) side is split creator/protocol by the ratio
-///     snapshotted at launch (50/50 at the default configuration) and credited
-///     to pull-based balances — creators and the protocol each claim their own
-///     earnings whenever they choose, so one blocked recipient can never jam
-///     collection for everyone else.
+/// collection; both the LAUNCHED-token side and the QUOTE side of the fees
+/// are split creator/protocol by the ratio snapshotted at launch (50/50 at the
+/// default configuration) and credited to pull-based balances. Creators and
+/// the protocol each claim their own earnings whenever they choose, so one
+/// blocked recipient can never jam collection for everyone else.
 
-contract EagleLiquidityLocker is IERC721Receiver, ReentrancyGuard {
+contract ZeroLiquidityLocker is IERC721Receiver, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @notice launch on eagle.family
@@ -1613,15 +1609,16 @@ contract EagleLiquidityLocker is IERC721Receiver, ReentrancyGuard {
         uint256 indexed tokenId,
         address indexed token,
         address caller,
+        uint256 creatorTokenAmount,
+        uint256 protocolTokenAmount,
         address quoteCurrency,
         uint256 creatorQuoteAmount,
-        uint256 protocolQuoteAmount,
-        uint256 tokensBurned
+        uint256 protocolQuoteAmount
     );
     event FeesClaimed(address indexed account, address indexed currency, address indexed to, uint256 amount);
 
     error OnlyPositionManagerNFTs();
-    error OnlyEagleFactory();
+    error OnlyZeroFactory();
     error OnlyCreatorFeeRecipient();
     error ZeroAddress();
     error PositionNotHeld(uint256 tokenId);
@@ -1647,7 +1644,7 @@ contract EagleLiquidityLocker is IERC721Receiver, ReentrancyGuard {
     function assignPosition(uint256 tokenId, address token, address creatorFeeRecipient, uint16 protocolFeeBps)
         external
     {
-        if (msg.sender != brewFactory) revert OnlyEagleFactory();
+        if (msg.sender != brewFactory) revert OnlyZeroFactory();
         if (token == address(0) || creatorFeeRecipient == address(0)) revert ZeroAddress();
         if (protocolFeeBps > BPS_DENOMINATOR / 2) revert InvalidProtocolFee();
         if (positionManager.ownerOf(tokenId) != address(this)) revert PositionNotHeld(tokenId);
@@ -1659,9 +1656,8 @@ contract EagleLiquidityLocker is IERC721Receiver, ReentrancyGuard {
         emit PositionAssigned(tokenId, token, creatorFeeRecipient, protocolFeeBps);
     }
 
-    /// @notice Collects accrued swap fees for one locked position, credits the
-    /// creator's pull-balance, auto-forwards the protocol share to treasury,
-    /// and burns the launched-token side. Callable by anyone.
+    /// @notice Collects accrued swap fees for one locked position and credits
+    /// both currencies to creator/protocol pull-balances. Callable by anyone.
     function collectFees(uint256 tokenId) public nonReentrant returns (uint256 amount0, uint256 amount1) {
         LockedPosition memory locked = lockedPositions[tokenId];
         if (locked.token == address(0)) revert PositionNotAssigned(tokenId);
@@ -1687,21 +1683,19 @@ contract EagleLiquidityLocker is IERC721Receiver, ReentrancyGuard {
         (uint256 tokenSideAmount, uint256 quoteSideAmount, address quoteCurrency) =
             token0 == locked.token ? (amount0, amount1, token1) : (amount1, amount0, token0);
 
-        // Quote side: the creator share stays pull-based, while the protocol
-        // share is transferred to the current treasury immediately.
+        // Split both currencies into creator/protocol pull-balances.
+        uint256 protocolToken = (tokenSideAmount * locked.protocolFeeBps) / BPS_DENOMINATOR;
+        uint256 creatorToken = tokenSideAmount - protocolToken;
         uint256 protocolQuote = (quoteSideAmount * locked.protocolFeeBps) / BPS_DENOMINATOR;
         uint256 creatorQuote = quoteSideAmount - protocolQuote;
+        if (creatorToken > 0) claimableFees[locked.creatorFeeRecipient][locked.token] += creatorToken;
         if (creatorQuote > 0) claimableFees[locked.creatorFeeRecipient][quoteCurrency] += creatorQuote;
-        if (protocolQuote > 0) {
-            IERC20(quoteCurrency).safeTransfer(IEagleFeeConfig(brewFactory).treasury(), protocolQuote);
-        }
-
-        // Launched-token side: burned in full. EagleTokens are hook-free, so
-        // the burn cannot revert or be blocked.
-        if (tokenSideAmount > 0) IERC20(locked.token).safeTransfer(DEAD, tokenSideAmount);
+        address treasury = IZeroFeeConfig(brewFactory).treasury();
+        if (protocolToken > 0) claimableFees[treasury][locked.token] += protocolToken;
+        if (protocolQuote > 0) claimableFees[treasury][quoteCurrency] += protocolQuote;
 
         emit FeesCollected(
-            tokenId, locked.token, msg.sender, quoteCurrency, creatorQuote, protocolQuote, tokenSideAmount
+            tokenId, locked.token, msg.sender, creatorToken, protocolToken, quoteCurrency, creatorQuote, protocolQuote
         );
     }
 
@@ -1792,7 +1786,7 @@ contract EagleToken is ERC20 {
  * from ERC-721 asset contracts.
  */
 
-contract EagleFactory is Ownable2Step, ReentrancyGuard, IPancakeV3SwapCallback, IUniswapV3SwapCallback {
+contract ZeroFactory is Ownable2Step, ReentrancyGuard, IPancakeV3SwapCallback, IUniswapV3SwapCallback {
     using SafeERC20 for IERC20;
 
     /// @notice launch on eagle.family
@@ -1863,7 +1857,7 @@ contract EagleFactory is Ownable2Step, ReentrancyGuard, IPancakeV3SwapCallback, 
     IPancakeV3Factory public immutable pancakeV3Factory;
     INonfungiblePositionManager public immutable positionManager;
     address public immutable wbnb;
-    EagleLiquidityLocker public immutable locker;
+    ZeroLiquidityLocker public immutable locker;
 
     // ---------------------------------------------------------------- config
 
@@ -1947,7 +1941,7 @@ contract EagleFactory is Ownable2Step, ReentrancyGuard, IPancakeV3SwapCallback, 
         treasury = treasury_;
         launchFeeWei = launchFeeWei_;
         protocolLpFeeBps = protocolLpFeeBps_;
-        locker = new EagleLiquidityLocker(positionManager_, address(this));
+        locker = new ZeroLiquidityLocker(positionManager_, address(this));
     }
 
     // ---------------------------------------------------------------- launch
@@ -2279,16 +2273,16 @@ contract EagleFactory is Ownable2Step, ReentrancyGuard, IPancakeV3SwapCallback, 
 /// by every router and aggregator — so per-wallet dividend pushes are
 /// impossible without breaking that guarantee. The vanilla-token way to pay
 /// every holder pro-rata is buyback-and-burn: this contract claims the
-/// creator's 50% quote-fee credit from the locker, market-buys the launched
-/// token through its own pool, and burns the proceeds. Every holder's share
-/// of the supply grows in the same transaction, with no snapshots, no claims,
-/// and no server.
+/// creator's fee credits from the locker, burns any launched-token fees
+/// directly, market-buys more launched tokens with the quote-token fees, and
+/// burns those proceeds as well. Every holder's share of the supply grows in
+/// the same transaction, with no snapshots, no claims, and no server.
 ///
 /// A creator opts in by making this contract their fee recipient — at launch
 /// (the launch form's "fees to holders" option) or later via
 /// `setCreatorFeeRecipient`. Opting in is PERMANENT: nothing in this contract
 /// can hand the recipient role back.
-contract EagleHolderDistributor is IPancakeV3SwapCallback, IUniswapV3SwapCallback, ReentrancyGuard {
+contract ZeroHolderDistributor is IPancakeV3SwapCallback, IUniswapV3SwapCallback, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @notice launch on eagle.family
@@ -2299,7 +2293,7 @@ contract EagleHolderDistributor is IPancakeV3SwapCallback, IUniswapV3SwapCallbac
     address public immutable token;
     address public immutable quoteToken;
     address public immutable pool;
-    EagleLiquidityLocker public immutable locker;
+    ZeroLiquidityLocker public immutable locker;
 
     bool private _inSwap;
 
@@ -2310,7 +2304,7 @@ contract EagleHolderDistributor is IPancakeV3SwapCallback, IUniswapV3SwapCallbac
     error SlippageExceeded(uint256 burned, uint256 minimum);
     error UnexpectedSwapCallback();
 
-    constructor(EagleFactory brewFactory_, address token_) {
+    constructor(ZeroFactory brewFactory_, address token_) {
         (, address quoteToken_, address pool_,,,) = brewFactory_.launches(token_);
         if (pool_ == address(0)) revert UnknownLaunch();
         token = token_;
@@ -2329,12 +2323,22 @@ contract EagleHolderDistributor is IPancakeV3SwapCallback, IUniswapV3SwapCallbac
         nonReentrant
         returns (uint256 quoteSpent, uint256 tokensBurned)
     {
+        uint256 deadBalanceBefore = IERC20(token).balanceOf(DEAD);
         locker.collectAllFees(token);
+        if (locker.claimableFees(address(this), token) > 0) {
+            locker.claimFees(token, DEAD);
+        }
         if (locker.claimableFees(address(this), quoteToken) > 0) {
             locker.claimFees(quoteToken, address(this));
         }
         uint256 balance = IERC20(quoteToken).balanceOf(address(this));
-        if (balance == 0) revert NothingToDistribute();
+        if (balance == 0) {
+            uint256 burnedTotal = IERC20(token).balanceOf(DEAD) - deadBalanceBefore;
+            if (burnedTotal == 0) revert NothingToDistribute();
+            if (burnedTotal < minTokensOut) revert SlippageExceeded(burnedTotal, minTokensOut);
+            emit DistributedToHolders(msg.sender, 0, burnedTotal);
+            return (0, burnedTotal);
+        }
 
         bool zeroForOne = quoteToken < token;
         _inSwap = true;
@@ -2347,7 +2351,7 @@ contract EagleHolderDistributor is IPancakeV3SwapCallback, IUniswapV3SwapCallbac
         );
         _inSwap = false;
 
-        tokensBurned = uint256(-(zeroForOne ? amount1 : amount0));
+        tokensBurned = IERC20(token).balanceOf(DEAD) - deadBalanceBefore;
         quoteSpent = uint256(zeroForOne ? amount0 : amount1);
         if (tokensBurned < minTokensOut) revert SlippageExceeded(tokensBurned, minTokensOut);
         emit DistributedToHolders(msg.sender, quoteSpent, tokensBurned);
@@ -2374,17 +2378,17 @@ contract EagleHolderDistributor is IPancakeV3SwapCallback, IUniswapV3SwapCallbac
 /// isolated per launch; the address is predictable before the token launches,
 /// which lets the launch form route creator fees to holders from block one.
 
-contract EagleDistributorFactory {
+contract ZeroDistributorFactory {
     /// @notice launch on eagle.family
     string public constant EAGLE = "launch on eagle.family";
 
-    EagleFactory public immutable brewFactory;
+    ZeroFactory public immutable brewFactory;
 
     mapping(address token => address distributor) public distributorOf;
 
     event DistributorCreated(address indexed token, address indexed distributor);
 
-    constructor(EagleFactory brewFactory_) {
+    constructor(ZeroFactory brewFactory_) {
         brewFactory = brewFactory_;
     }
 
@@ -2393,7 +2397,7 @@ contract EagleDistributorFactory {
         distributor = distributorOf[token];
         if (distributor != address(0)) return distributor;
         distributor = address(
-            new EagleHolderDistributor{salt: bytes32(uint256(uint160(token)))}(brewFactory, token)
+            new ZeroHolderDistributor{salt: bytes32(uint256(uint160(token)))}(brewFactory, token)
         );
         distributorOf[token] = distributor;
         emit DistributorCreated(token, distributor);
@@ -2404,14 +2408,14 @@ contract EagleDistributorFactory {
         external
         returns (uint256 quoteSpent, uint256 tokensBurned)
     {
-        return EagleHolderDistributor(create(token)).distribute(minTokensOut);
+        return ZeroHolderDistributor(create(token)).distribute(minTokensOut);
     }
 
     /// @notice The distributor address a token will get — valid even before
     /// the token launches, so it can be the launch's creatorFeeRecipient.
     function predict(address token) external view returns (address) {
         bytes32 initCodeHash = keccak256(
-            abi.encodePacked(type(EagleHolderDistributor).creationCode, abi.encode(brewFactory, token))
+            abi.encodePacked(type(ZeroHolderDistributor).creationCode, abi.encode(brewFactory, token))
         );
         return address(
             uint160(

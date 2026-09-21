@@ -316,7 +316,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
   const [firstBuy, setFirstBuy] = useState('0.00');
   const [feeWallet, setFeeWallet] = useState('');
   const [quoteTokenInput, setQuoteTokenInput] = useState('');
-  const [totalSupply] = useState('1000000000');
+  const [totalSupply] = useState('100000000000');
   const [feeTier] = useState<100 | 500 | 2500 | 10000>(10000);
   const [initialBuyMinTokensOut] = useState('0');
   const resolvedCustomQuoteToken = pair === 'ANY' && isAddress(quoteTokenInput) ? quoteTokenInput : undefined;

@@ -35,6 +35,43 @@ function requiredNumber(name) {
   return value;
 }
 
+async function resolveLockerAddress(factory, factoryAddress) {
+  const currentProvider = hre.ethers.provider;
+  const candidates = [];
+  if (hre.network.name === 'base') {
+    candidates.push(process.env.BASE_RPC_URL, 'https://mainnet.base.org', 'https://base-rpc.publicnode.com');
+  }
+
+  const encoded = factory.interface.encodeFunctionData('locker');
+  const seen = new Set();
+  const providers = [currentProvider];
+
+  for (const url of candidates) {
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    providers.push(new hre.ethers.JsonRpcProvider(url));
+  }
+
+  let lastError;
+  for (const provider of providers) {
+    try {
+      const code = await provider.getCode(factoryAddress);
+      if (!code || code === '0x') {
+        continue;
+      }
+      const result = await provider.call({ to: factoryAddress, data: encoded });
+      if (!result || result === '0x') {
+        continue;
+      }
+      return factory.interface.decodeFunctionResult('locker', result)[0];
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError ?? new Error(`Unable to resolve locker() for factory ${factoryAddress}`);
+}
+
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
   if (!deployer) {
@@ -56,7 +93,7 @@ async function main() {
   console.log(`Factory owner: ${params.owner}`);
   console.log(`Factory treasury: ${params.treasury}`);
 
-  const eagleFactoryFactory = await hre.ethers.getContractFactory('EagleFactory');
+  const eagleFactoryFactory = await hre.ethers.getContractFactory('contracts/BrewLaunchSuite.sol:ZeroFactory');
   const eagleFactory = await eagleFactoryFactory.deploy(
     params.pancakeV3Factory,
     params.positionManager,
@@ -69,9 +106,12 @@ async function main() {
   await eagleFactory.waitForDeployment();
 
   const eagleFactoryAddress = await eagleFactory.getAddress();
-  const lockerAddress = await eagleFactory.locker();
+  console.log(`Factory deployed: ${eagleFactoryAddress}`);
+  const lockerAddress = await resolveLockerAddress(eagleFactory, eagleFactoryAddress);
 
-  const distributorFactoryFactory = await hre.ethers.getContractFactory('EagleDistributorFactory');
+  const distributorFactoryFactory = await hre.ethers.getContractFactory(
+    'contracts/BrewLaunchSuite.sol:ZeroDistributorFactory',
+  );
   const distributorFactory = await distributorFactoryFactory.deploy(eagleFactoryAddress);
   await distributorFactory.waitForDeployment();
 
@@ -93,7 +133,7 @@ async function main() {
     verification: {
       eagleFactory: {
         address: eagleFactoryAddress,
-        contract: 'contracts/BrewLaunchSuite.sol:EagleFactory',
+        contract: 'contracts/BrewLaunchSuite.sol:ZeroFactory',
         constructorArguments: [
           params.pancakeV3Factory,
           params.positionManager,
@@ -106,12 +146,12 @@ async function main() {
       },
       eagleLiquidityLocker: {
         address: lockerAddress,
-        contract: 'contracts/BrewLaunchSuite.sol:EagleLiquidityLocker',
+        contract: 'contracts/BrewLaunchSuite.sol:ZeroLiquidityLocker',
         constructorArguments: [params.positionManager, eagleFactoryAddress],
       },
       eagleDistributorFactory: {
         address: distributorFactoryAddress,
-        contract: 'contracts/BrewLaunchSuite.sol:EagleDistributorFactory',
+        contract: 'contracts/BrewLaunchSuite.sol:ZeroDistributorFactory',
         constructorArguments: [eagleFactoryAddress],
       },
     },

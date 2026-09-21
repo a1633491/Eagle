@@ -23,7 +23,7 @@ function npmCommand() {
 
 function normalizeVerifyChainKey(value: string) {
   const normalized = value.trim().toLowerCase();
-  if (normalized === 'bsc' || normalized === 'base' || normalized === 'robinhood') {
+  if (normalized === 'bsc' || normalized === 'base' || normalized === 'robinhood' || normalized === 'arc') {
     return normalized;
   }
   return null;

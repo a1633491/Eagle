@@ -34,9 +34,9 @@ async function main() {
 
   const deployment = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
 
-  await verify(deployment.verification.eagleFactory, 'EagleFactory');
-  await verify(deployment.verification.eagleLiquidityLocker, 'EagleLiquidityLocker');
-  await verify(deployment.verification.eagleDistributorFactory, 'EagleDistributorFactory');
+  await verify(deployment.verification.eagleFactory, 'ZeroFactory');
+  await verify(deployment.verification.eagleLiquidityLocker, 'ZeroLiquidityLocker');
+  await verify(deployment.verification.eagleDistributorFactory, 'ZeroDistributorFactory');
 }
 
 main().catch((error) => {

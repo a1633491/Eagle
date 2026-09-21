@@ -40,7 +40,8 @@ export const chainConfigs: Record<ChainKey, ServerChainConfig> = {
     factoryEnvKey: 'EAGLE_FACTORY_ADDRESS',
     factoryStartBlockEnvKey: 'EAGLE_FACTORY_START_BLOCK',
     supportsFactorySync: true,
-    defaultFactoryAddress: '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE',
+    defaultFactoryAddress: '0x9C0E862cD8a3993c8123292E2aD888713759C3f5',
+    defaultFactoryStartBlock: '123158083',
     defaultRpcUrls: ['https://bsc-dataseed.bnbchain.org'],
   },
   base: {
@@ -58,7 +59,8 @@ export const chainConfigs: Record<ChainKey, ServerChainConfig> = {
     factoryEnvKey: 'BASE_FACTORY_ADDRESS',
     factoryStartBlockEnvKey: 'BASE_FACTORY_START_BLOCK',
     supportsFactorySync: true,
-    defaultFactoryAddress: '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE',
+    defaultFactoryAddress: '0x457291634E700971675060560BBFa6eA7dc27176',
+    defaultFactoryStartBlock: '51596956',
     defaultRpcUrls: ['https://mainnet.base.org', 'https://base-rpc.publicnode.com'],
   },
   robinhood: {
@@ -79,8 +81,8 @@ export const chainConfigs: Record<ChainKey, ServerChainConfig> = {
     factoryEnvKey: 'ROBINHOOD_FACTORY_ADDRESS',
     factoryStartBlockEnvKey: 'ROBINHOOD_FACTORY_START_BLOCK',
     supportsFactorySync: true,
-    defaultFactoryAddress: '0x3A4CE33bb65b9429465b6EAda2F29C9f7bF0a122',
-    defaultFactoryStartBlock: '61971645',
+    defaultFactoryAddress: '0x2224A3A2e9bC11D3157E9Ab6440BD8AE58bFdF50',
+    defaultFactoryStartBlock: '68693414',
     defaultRpcUrls: ['https://rpc.mainnet.chain.robinhood.com', 'https://robinhood.drpc.org'],
   },
   arc: {
@@ -101,8 +103,8 @@ export const chainConfigs: Record<ChainKey, ServerChainConfig> = {
     factoryEnvKey: 'ARC_FACTORY_ADDRESS',
     factoryStartBlockEnvKey: 'ARC_FACTORY_START_BLOCK',
     supportsFactorySync: true,
-    defaultFactoryAddress: '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE',
-    defaultFactoryStartBlock: '21177224',
+    defaultFactoryAddress: '0x9D4417CCb6536e82e39dA1f258C79B2928983760',
+    defaultFactoryStartBlock: '21988492',
     defaultRpcUrls: ['https://rpc.mainnet.arc.io', 'https://rpc.blockdaemon.mainnet.arc.io'],
   },
 };

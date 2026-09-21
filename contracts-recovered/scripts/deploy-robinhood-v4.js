@@ -45,6 +45,7 @@ async function main() {
     poolManager: requiredAddress('UNISWAP_V4_POOL_MANAGER'),
     positionManager: requiredAddress('UNISWAP_V4_POSITION_MANAGER'),
     wrappedNative: requiredAddress('WETH'),
+    universalRouter: requiredAddress('UNISWAP_UNIVERSAL_ROUTER'),
     owner: requiredAddress('FACTORY_OWNER'),
     treasury: requiredAddress('FACTORY_TREASURY'),
     launchFeeWei: requiredBigInt('LAUNCH_FEE_WEI'),
@@ -56,11 +57,12 @@ async function main() {
   console.log(`Factory owner: ${params.owner}`);
   console.log(`Factory treasury: ${params.treasury}`);
 
-  const factoryFactory = await hre.ethers.getContractFactory('RobinhoodV4Factory');
+  const factoryFactory = await hre.ethers.getContractFactory('contracts/RobinhoodUniV4LaunchSuite.sol:ZeroFactory');
   const factory = await factoryFactory.deploy(
     params.poolManager,
     params.positionManager,
     params.wrappedNative,
+    params.universalRouter,
     params.owner,
     params.treasury,
     params.launchFeeWei,
@@ -70,6 +72,12 @@ async function main() {
 
   const factoryAddress = await factory.getAddress();
   const lockerAddress = await factory.locker();
+  const distributorFactoryFactory = await hre.ethers.getContractFactory(
+    'contracts/RobinhoodUniV4LaunchSuite.sol:ZeroDistributorFactory',
+  );
+  const distributorFactory = await distributorFactoryFactory.deploy(factoryAddress);
+  await distributorFactory.waitForDeployment();
+  const distributorFactoryAddress = await distributorFactory.getAddress();
 
   const deployment = {
     network: hre.network.name,
@@ -78,20 +86,23 @@ async function main() {
     uniswapV4PoolManager: params.poolManager,
     uniswapV4PositionManager: params.positionManager,
     wrappedNative: params.wrappedNative,
+    universalRouter: params.universalRouter,
     owner: params.owner,
     treasury: params.treasury,
     launchFeeWei: params.launchFeeWei.toString(),
     protocolLpFeeBps: params.protocolLpFeeBps,
     robinhoodV4Factory: factoryAddress,
     robinhoodV4LiquidityLocker: lockerAddress,
+    robinhoodV4DistributorFactory: distributorFactoryAddress,
     verification: {
       robinhoodV4Factory: {
         address: factoryAddress,
-        contract: 'contracts/RobinhoodUniV4LaunchSuite.sol:RobinhoodV4Factory',
+        contract: 'contracts/RobinhoodUniV4LaunchSuite.sol:ZeroFactory',
         constructorArguments: [
           params.poolManager,
           params.positionManager,
           params.wrappedNative,
+          params.universalRouter,
           params.owner,
           params.treasury,
           params.launchFeeWei.toString(),
@@ -100,8 +111,13 @@ async function main() {
       },
       robinhoodV4LiquidityLocker: {
         address: lockerAddress,
-        contract: 'contracts/RobinhoodUniV4LaunchSuite.sol:RobinhoodV4LiquidityLocker',
+        contract: 'contracts/RobinhoodUniV4LaunchSuite.sol:ZeroLiquidityLocker',
         constructorArguments: [params.positionManager, factoryAddress],
+      },
+      robinhoodV4DistributorFactory: {
+        address: distributorFactoryAddress,
+        contract: 'contracts/RobinhoodUniV4LaunchSuite.sol:ZeroDistributorFactory',
+        constructorArguments: [factoryAddress],
       },
     },
   };

@@ -27,8 +27,9 @@ async function main() {
   }
 
   const deployment = JSON.parse(fs.readFileSync(deploymentFile, 'utf8'));
-  await verify(deployment.verification.robinhoodV4Factory, 'RobinhoodV4Factory');
-  await verify(deployment.verification.robinhoodV4LiquidityLocker, 'RobinhoodV4LiquidityLocker');
+  await verify(deployment.verification.robinhoodV4Factory, 'ZeroFactory');
+  await verify(deployment.verification.robinhoodV4LiquidityLocker, 'ZeroLiquidityLocker');
+  await verify(deployment.verification.robinhoodV4DistributorFactory, 'ZeroDistributorFactory');
 }
 
 main().catch((error) => {

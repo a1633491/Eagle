@@ -314,12 +314,12 @@ export const tickSpacingByFeeTier: Record<(typeof supportedFeeTiers)[number], nu
 };
 
 export const defaultLaunchConfig = {
-  totalSupply: BigInt(1_000_000_000) * BigInt(10) ** BigInt(18),
+  totalSupply: BigInt(100_000_000_000) * BigInt(10) ** BigInt(18),
   feeTier: 10_000,
   initialTick: 0,
-  targetLaunchPriceUsd: 0.0000025,
+  targetLaunchPriceUsd: 0.000000025,
   initialBuyMinTokensOut: BigInt(0),
-  maxLaunchFeeWeiFallback: BigInt('10000000000000000'),
+  maxLaunchFeeWeiFallback: BigInt(0),
 } as const;
 
 export function getLaunchFactoryAbi(_chainKey: ChainKey): Abi {

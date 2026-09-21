@@ -7,38 +7,38 @@
   "wbnb": "0x4200000000000000000000000000000000000006",
   "owner": "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
   "treasury": "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
-  "launchFeeWei": "10000000000000000",
+  "launchFeeWei": "0",
   "protocolLpFeeBps": 5000,
-  "eagleFactory": "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE",
-  "eagleLiquidityLocker": "0x01ec131cF83F2978780D969b79f4839090618187",
-  "eagleDistributorFactory": "0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726",
+  "eagleFactory": "0x457291634E700971675060560BBFa6eA7dc27176",
+  "eagleLiquidityLocker": "0x3649d68F352aCA7934a496Fa1499c0f74f5C4077",
+  "eagleDistributorFactory": "0x4d3AA9f7f10FD370052c17494B2c4dE6B24d20Dc",
   "verification": {
     "eagleFactory": {
-      "address": "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE",
-      "contract": "contracts/BrewLaunchSuite.sol:EagleFactory",
+      "address": "0x457291634E700971675060560BBFa6eA7dc27176",
+      "contract": "contracts/BrewLaunchSuite.sol:ZeroFactory",
       "constructorArguments": [
         "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865",
         "0x46A15B0b27311cedF172AB29E4f4766fbE7F4364",
         "0x4200000000000000000000000000000000000006",
         "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
         "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
-        "10000000000000000",
+        "0",
         5000
       ]
     },
     "eagleLiquidityLocker": {
-      "address": "0x01ec131cF83F2978780D969b79f4839090618187",
-      "contract": "contracts/BrewLaunchSuite.sol:EagleLiquidityLocker",
+      "address": "0x3649d68F352aCA7934a496Fa1499c0f74f5C4077",
+      "contract": "contracts/BrewLaunchSuite.sol:ZeroLiquidityLocker",
       "constructorArguments": [
         "0x46A15B0b27311cedF172AB29E4f4766fbE7F4364",
-        "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE"
+        "0x457291634E700971675060560BBFa6eA7dc27176"
       ]
     },
     "eagleDistributorFactory": {
-      "address": "0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726",
-      "contract": "contracts/BrewLaunchSuite.sol:EagleDistributorFactory",
+      "address": "0x4d3AA9f7f10FD370052c17494B2c4dE6B24d20Dc",
+      "contract": "contracts/BrewLaunchSuite.sol:ZeroDistributorFactory",
       "constructorArguments": [
-        "0xEfca26BAc433975a27E894eeD196C8a1D32c4beE"
+        "0x457291634E700971675060560BBFa6eA7dc27176"
       ]
     }
   }

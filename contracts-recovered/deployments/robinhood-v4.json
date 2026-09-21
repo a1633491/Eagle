@@ -5,20 +5,23 @@
   "uniswapV4PoolManager": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
   "uniswapV4PositionManager": "0x58daec3116aae6D93017bAAea7749052E8a04fA7",
   "wrappedNative": "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+  "universalRouter": "0x06AfBA43Fd06227fA663b0DAecF536f6EaA6bf99",
   "owner": "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
   "treasury": "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
   "launchFeeWei": "0",
   "protocolLpFeeBps": 5000,
-  "robinhoodV4Factory": "0x45885Af25A1dF74f90B995A0aD1DF5623Ee22Ad7",
-  "robinhoodV4LiquidityLocker": "0x84BF96173F410F08Be868F53ACbE42B8d269e508",
+  "robinhoodV4Factory": "0x2224A3A2e9bC11D3157E9Ab6440BD8AE58bFdF50",
+  "robinhoodV4LiquidityLocker": "0x5E61D4d688F2a3594f6Ca03BC2d2e37eA8247827",
+  "robinhoodV4DistributorFactory": "0x91aa7ADF55c60cfFD2d75c6bF6D9b06648393850",
   "verification": {
     "robinhoodV4Factory": {
-      "address": "0x45885Af25A1dF74f90B995A0aD1DF5623Ee22Ad7",
-      "contract": "contracts/RobinhoodUniV4LaunchSuite.sol:RobinhoodV4Factory",
+      "address": "0x2224A3A2e9bC11D3157E9Ab6440BD8AE58bFdF50",
+      "contract": "contracts/RobinhoodUniV4LaunchSuite.sol:ZeroFactory",
       "constructorArguments": [
         "0x8366a39CC670B4001A1121B8F6A443A643e40951",
         "0x58daec3116aae6D93017bAAea7749052E8a04fA7",
         "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73",
+        "0x06AfBA43Fd06227fA663b0DAecF536f6EaA6bf99",
         "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
         "0x29033EFBFA79351DBE1993c6e664A2104F050Fb5",
         "0",
@@ -26,11 +29,18 @@
       ]
     },
     "robinhoodV4LiquidityLocker": {
-      "address": "0x84BF96173F410F08Be868F53ACbE42B8d269e508",
-      "contract": "contracts/RobinhoodUniV4LaunchSuite.sol:RobinhoodV4LiquidityLocker",
+      "address": "0x5E61D4d688F2a3594f6Ca03BC2d2e37eA8247827",
+      "contract": "contracts/RobinhoodUniV4LaunchSuite.sol:ZeroLiquidityLocker",
       "constructorArguments": [
         "0x58daec3116aae6D93017bAAea7749052E8a04fA7",
-        "0x45885Af25A1dF74f90B995A0aD1DF5623Ee22Ad7"
+        "0x2224A3A2e9bC11D3157E9Ab6440BD8AE58bFdF50"
+      ]
+    },
+    "robinhoodV4DistributorFactory": {
+      "address": "0x91aa7ADF55c60cfFD2d75c6bF6D9b06648393850",
+      "contract": "contracts/RobinhoodUniV4LaunchSuite.sol:ZeroDistributorFactory",
+      "constructorArguments": [
+        "0x2224A3A2e9bC11D3157E9Ab6440BD8AE58bFdF50"
       ]
     }
   }

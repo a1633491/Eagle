@@ -1,7 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "./BrewLaunchSuite.sol";
+import {
+    EagleToken,
+    IERC20,
+    IERC721Receiver,
+    IWBNB,
+    Ownable,
+    Ownable2Step,
+    ReentrancyGuard,
+    SafeERC20,
+    TickMath
+} from "./BrewLaunchSuite.sol";
 
 library FullMath {
     function mulDiv(uint256 a, uint256 b, uint256 denominator) internal pure returns (uint256 result) {
@@ -58,6 +68,16 @@ library RobinhoodV4Actions {
     uint8 internal constant TAKE_PAIR = 0x11;
 }
 
+library RobinhoodV4SwapActions {
+    uint8 internal constant SWAP_EXACT_IN_SINGLE = 0x06;
+    uint8 internal constant SETTLE_ALL = 0x0c;
+    uint8 internal constant TAKE_ALL = 0x0f;
+}
+
+library RobinhoodUniversalRouterCommands {
+    bytes1 internal constant V4_SWAP = 0x10;
+}
+
 struct V4PoolKey {
     address currency0;
     address currency1;
@@ -70,6 +90,14 @@ interface IUniswapV4PoolManager {
     function initialize(V4PoolKey memory key, uint160 sqrtPriceX96) external returns (int24);
 }
 
+struct V4ExactInputSingleParams {
+    V4PoolKey poolKey;
+    bool zeroForOne;
+    uint128 amountIn;
+    uint128 amountOutMinimum;
+    bytes hookData;
+}
+
 interface IUniswapV4PositionManager {
     function modifyLiquidities(bytes calldata unlockData, uint256 deadline) external payable;
     function ownerOf(uint256 tokenId) external view returns (address owner);
@@ -77,15 +105,19 @@ interface IUniswapV4PositionManager {
     function permit2() external view returns (address permit2_);
 }
 
+interface IUniversalRouter {
+    function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external payable;
+}
+
 interface IPermit2AllowanceTransfer {
     function approve(address token, address spender, uint160 amount, uint48 expiration) external;
 }
 
-interface IEagleV4FeeConfig {
+interface IZeroV4FeeConfig {
     function treasury() external view returns (address);
 }
 
-contract RobinhoodV4LiquidityLocker is IERC721Receiver, ReentrancyGuard {
+contract ZeroLiquidityLocker is IERC721Receiver, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     string public constant EAGLE = "launch on eagle.family";
@@ -123,15 +155,16 @@ contract RobinhoodV4LiquidityLocker is IERC721Receiver, ReentrancyGuard {
         uint256 indexed tokenId,
         address indexed token,
         address caller,
+        uint256 creatorTokenAmount,
+        uint256 protocolTokenAmount,
         address quoteCurrency,
         uint256 creatorQuoteAmount,
-        uint256 protocolQuoteAmount,
-        uint256 tokensBurned
+        uint256 protocolQuoteAmount
     );
     event FeesClaimed(address indexed account, address indexed currency, address indexed to, uint256 amount);
 
     error OnlyPositionManagerNFTs();
-    error OnlyEagleFactory();
+    error OnlyZeroFactory();
     error OnlyCreatorFeeRecipient();
     error ZeroAddress();
     error PositionNotHeld(uint256 tokenId);
@@ -160,7 +193,7 @@ contract RobinhoodV4LiquidityLocker is IERC721Receiver, ReentrancyGuard {
         address creatorFeeRecipient,
         uint16 protocolFeeBps
     ) external {
-        if (msg.sender != brewFactory) revert OnlyEagleFactory();
+        if (msg.sender != brewFactory) revert OnlyZeroFactory();
         if (token == address(0) || quoteToken == address(0) || creatorFeeRecipient == address(0)) revert ZeroAddress();
         if (protocolFeeBps > BPS_DENOMINATOR / 2) revert InvalidProtocolFee();
         if (positionManager.ownerOf(tokenId) != address(this)) revert PositionNotHeld(tokenId);
@@ -199,17 +232,18 @@ contract RobinhoodV4LiquidityLocker is IERC721Receiver, ReentrancyGuard {
         (uint256 tokenSideAmount, uint256 quoteSideAmount, address quoteCurrency) =
             currency0 == locked.token ? (amount0, amount1, currency1) : (amount1, amount0, currency0);
 
+        uint256 protocolToken = (tokenSideAmount * locked.protocolFeeBps) / BPS_DENOMINATOR;
+        uint256 creatorToken = tokenSideAmount - protocolToken;
         uint256 protocolQuote = (quoteSideAmount * locked.protocolFeeBps) / BPS_DENOMINATOR;
         uint256 creatorQuote = quoteSideAmount - protocolQuote;
+        if (creatorToken > 0) claimableFees[locked.creatorFeeRecipient][locked.token] += creatorToken;
         if (creatorQuote > 0) claimableFees[locked.creatorFeeRecipient][quoteCurrency] += creatorQuote;
-        if (protocolQuote > 0) {
-            IERC20(quoteCurrency).safeTransfer(IEagleV4FeeConfig(brewFactory).treasury(), protocolQuote);
-        }
-
-        if (tokenSideAmount > 0) IERC20(locked.token).safeTransfer(DEAD, tokenSideAmount);
+        address treasury = IZeroV4FeeConfig(brewFactory).treasury();
+        if (protocolToken > 0) claimableFees[treasury][locked.token] += protocolToken;
+        if (protocolQuote > 0) claimableFees[treasury][quoteCurrency] += protocolQuote;
 
         emit FeesCollected(
-            tokenId, locked.token, msg.sender, quoteCurrency, creatorQuote, protocolQuote, tokenSideAmount
+            tokenId, locked.token, msg.sender, creatorToken, protocolToken, quoteCurrency, creatorQuote, protocolQuote
         );
     }
 
@@ -247,7 +281,7 @@ contract RobinhoodV4LiquidityLocker is IERC721Receiver, ReentrancyGuard {
     }
 }
 
-contract RobinhoodV4Factory is Ownable2Step, ReentrancyGuard {
+contract ZeroFactory is Ownable2Step, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     string public constant EAGLE = "launch on eagle.family";
@@ -301,7 +335,8 @@ contract RobinhoodV4Factory is Ownable2Step, ReentrancyGuard {
     IUniswapV4PoolManager public immutable poolManager;
     IUniswapV4PositionManager public immutable positionManager;
     address public immutable wrappedNative;
-    RobinhoodV4LiquidityLocker public immutable locker;
+    address public immutable universalRouter;
+    ZeroLiquidityLocker public immutable locker;
 
     address public treasury;
     uint256 public launchFeeWei;
@@ -329,6 +364,7 @@ contract RobinhoodV4Factory is Ownable2Step, ReentrancyGuard {
     event LaunchFeeUpdated(uint256 launchFeeWei);
     event ProtocolLpFeeUpdated(uint16 protocolLpFeeBps);
     event PausedSet(bool paused);
+    event InitialBuyExecuted(address indexed token, address indexed recipient, uint256 quoteSpent, uint256 tokensOut);
 
     error LaunchesPaused();
     error ZeroAddress();
@@ -347,7 +383,6 @@ contract RobinhoodV4Factory is Ownable2Step, ReentrancyGuard {
     error ConfigOutOfBounds();
     error NativeTransferFailed();
     error LaunchFeeAboveCap(uint256 currentFee, uint256 consentedMax);
-    error UnsupportedInitialBuy();
     error AmountTooLarge();
     error PositionMintFailed();
 
@@ -355,12 +390,16 @@ contract RobinhoodV4Factory is Ownable2Step, ReentrancyGuard {
         IUniswapV4PoolManager poolManager_,
         IUniswapV4PositionManager positionManager_,
         address wrappedNative_,
+        address universalRouter_,
         address owner_,
         address treasury_,
         uint256 launchFeeWei_,
         uint16 protocolLpFeeBps_
     ) Ownable(owner_) {
-        if (address(poolManager_) == address(0) || address(positionManager_) == address(0) || wrappedNative_ == address(0))
+        if (
+            address(poolManager_) == address(0) || address(positionManager_) == address(0) || wrappedNative_ == address(0)
+                || universalRouter_ == address(0)
+        )
         {
             revert ZeroAddress();
         }
@@ -369,10 +408,11 @@ contract RobinhoodV4Factory is Ownable2Step, ReentrancyGuard {
         poolManager = poolManager_;
         positionManager = positionManager_;
         wrappedNative = wrappedNative_;
+        universalRouter = universalRouter_;
         treasury = treasury_;
         launchFeeWei = launchFeeWei_;
         protocolLpFeeBps = protocolLpFeeBps_;
-        locker = new RobinhoodV4LiquidityLocker(positionManager_, address(this));
+        locker = new ZeroLiquidityLocker(positionManager_, address(this));
     }
 
     function launch(LaunchParams calldata params)
@@ -382,18 +422,15 @@ contract RobinhoodV4Factory is Ownable2Step, ReentrancyGuard {
         returns (address token, bytes32 poolId, uint256[] memory positionIds)
     {
         if (paused) revert LaunchesPaused();
-        if (params.initialBuyQuoteAmount != 0 || params.initialBuyMinTokensOut != 0 || params.initialBuyRecipient != address(0)) {
-            revert UnsupportedInitialBuy();
-        }
-
         _validate(params);
-        _collectLaunchFee(params.maxLaunchFeeWei);
+        uint256 nativeInitialBuyWei = _collectLaunchFee(params);
 
         token = _deployToken(params);
         V4PoolKey memory poolKey = _poolKey(token, params.quoteToken, params.fee, params.tickSpacing, params.hooks);
         uint160 sqrtPriceX96 = TickMath.getSqrtRatioAtTick(_poolTick(token, params.quoteToken, params.initialTick));
         poolManager.initialize(poolKey, sqrtPriceX96);
         positionIds = _mintLockedPositions(token, poolKey, params);
+        _executeInitialBuy(token, poolKey, params, nativeInitialBuyWei);
         poolId = _poolId(poolKey);
 
         launches[token] = LaunchRecord({
@@ -505,10 +542,18 @@ contract RobinhoodV4Factory is Ownable2Step, ReentrancyGuard {
         if (count > 0 && bpsSum != BPS_DENOMINATOR) revert InvalidBps();
     }
 
-    function _collectLaunchFee(uint256 maxLaunchFeeWei) internal {
+    function _collectLaunchFee(LaunchParams calldata params) internal returns (uint256 nativeInitialBuyWei) {
         uint256 fee_ = launchFeeWei;
-        if (fee_ > maxLaunchFeeWei) revert LaunchFeeAboveCap(fee_, maxLaunchFeeWei);
-        if (msg.value != fee_) revert IncorrectNativeValue();
+        if (fee_ > params.maxLaunchFeeWei) revert LaunchFeeAboveCap(fee_, params.maxLaunchFeeWei);
+        uint256 expectedValue = fee_;
+        if (
+            params.initialBuyQuoteAmount > 0 && params.quoteToken == wrappedNative
+                && msg.value == fee_ + params.initialBuyQuoteAmount
+        ) {
+            nativeInitialBuyWei = params.initialBuyQuoteAmount;
+            expectedValue += params.initialBuyQuoteAmount;
+        }
+        if (msg.value != expectedValue) revert IncorrectNativeValue();
         if (fee_ > 0) {
             (bool ok,) = treasury.call{value: fee_}("");
             if (!ok) revert NativeTransferFailed();
@@ -576,6 +621,71 @@ contract RobinhoodV4Factory is Ownable2Step, ReentrancyGuard {
         if (dust > 0) IERC20(token).safeTransfer(DEAD, dust);
     }
 
+    function _executeInitialBuy(address token, V4PoolKey memory poolKey, LaunchParams calldata params, uint256 nativeBuyWei)
+        internal
+    {
+        uint256 amountIn = params.initialBuyQuoteAmount;
+        if (amountIn == 0) return;
+        if (amountIn > type(uint128).max) revert AmountTooLarge();
+
+        address recipient = params.initialBuyRecipient == address(0) ? msg.sender : params.initialBuyRecipient;
+        bool fundedNatively = nativeBuyWei > 0;
+        uint256 initialQuoteBalance = IERC20(params.quoteToken).balanceOf(address(this));
+        uint256 initialTokenBalance = IERC20(token).balanceOf(address(this));
+
+        if (fundedNatively) {
+            IWBNB(wrappedNative).deposit{value: nativeBuyWei}();
+        } else {
+            IERC20(params.quoteToken).safeTransferFrom(msg.sender, address(this), amountIn);
+        }
+
+        address permit2 = positionManager.permit2();
+        IERC20(params.quoteToken).forceApprove(permit2, amountIn);
+        IPermit2AllowanceTransfer(permit2).approve(params.quoteToken, universalRouter, uint160(amountIn), type(uint48).max);
+
+        bytes memory commands = abi.encodePacked(RobinhoodUniversalRouterCommands.V4_SWAP);
+        bytes memory actions = abi.encodePacked(
+            RobinhoodV4SwapActions.SWAP_EXACT_IN_SINGLE,
+            RobinhoodV4SwapActions.SETTLE_ALL,
+            RobinhoodV4SwapActions.TAKE_ALL
+        );
+        bytes[] memory actionParams = new bytes[](3);
+        actionParams[0] = abi.encode(
+            V4ExactInputSingleParams({
+                poolKey: poolKey,
+                zeroForOne: params.quoteToken == poolKey.currency0,
+                amountIn: uint128(amountIn),
+                amountOutMinimum: uint128(params.initialBuyMinTokensOut),
+                hookData: bytes("")
+            })
+        );
+        actionParams[1] = abi.encode(params.quoteToken, amountIn);
+        actionParams[2] = abi.encode(token, params.initialBuyMinTokensOut);
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = abi.encode(actions, actionParams);
+
+        IUniversalRouter(universalRouter).execute(commands, inputs, block.timestamp + 20);
+
+        IPermit2AllowanceTransfer(permit2).approve(params.quoteToken, universalRouter, 0, 0);
+        IERC20(params.quoteToken).forceApprove(permit2, 0);
+
+        uint256 tokensOut = IERC20(token).balanceOf(address(this)) - initialTokenBalance;
+        if (tokensOut > 0) IERC20(token).safeTransfer(recipient, tokensOut);
+
+        uint256 leftover = IERC20(params.quoteToken).balanceOf(address(this)) - initialQuoteBalance;
+        if (leftover > 0) {
+            if (fundedNatively) {
+                IWBNB(wrappedNative).withdraw(leftover);
+                (bool ok,) = msg.sender.call{value: leftover}("");
+                if (!ok) revert NativeTransferFailed();
+            } else {
+                IERC20(params.quoteToken).safeTransfer(msg.sender, leftover);
+            }
+        }
+
+        emit InitialBuyExecuted(token, recipient, amountIn - leftover, tokensOut);
+    }
+
     function _positionSlice(LaunchParams calldata params, uint256 i, uint256 count, uint256 remaining)
         internal
         pure
@@ -632,5 +742,167 @@ contract RobinhoodV4Factory is Ownable2Step, ReentrancyGuard {
         uint160 sqrtRatioBX96 = TickMath.getSqrtRatioAtTick(tickUpper);
         if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
         return FullMath.mulDiv(amount1, Q96, uint256(sqrtRatioBX96) - uint256(sqrtRatioAX96));
+    }
+
+    /// @dev Accepts native ETH only while unwrapping WETH refunds.
+    receive() external payable {
+        if (msg.sender != wrappedNative) revert IncorrectNativeValue();
+    }
+}
+
+contract ZeroHolderDistributor is ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
+    string public constant EAGLE = "launch on eagle.family";
+
+    address internal constant DEAD = 0x000000000000000000000000000000000000dEaD;
+
+    address public immutable token;
+    address public immutable quoteToken;
+    uint24 public immutable fee;
+    int24 public immutable tickSpacing;
+    address public immutable hooks;
+    address public immutable universalRouter;
+    ZeroLiquidityLocker public immutable locker;
+    IUniswapV4PositionManager public immutable positionManager;
+
+    event DistributedToHolders(address indexed caller, uint256 quoteSpent, uint256 tokensBurned);
+
+    error UnknownLaunch();
+    error NothingToDistribute();
+    error SlippageExceeded(uint256 burned, uint256 minimum);
+    error AmountTooLarge();
+
+    constructor(ZeroFactory brewFactory_, address token_) {
+        (, address quoteToken_,, uint24 fee_, int24 tickSpacing_, address hooks_,, uint64 launchedAtBlock) =
+            brewFactory_.launches(token_);
+        if (launchedAtBlock == 0) revert UnknownLaunch();
+        token = token_;
+        quoteToken = quoteToken_;
+        fee = fee_;
+        tickSpacing = tickSpacing_;
+        hooks = hooks_;
+        universalRouter = brewFactory_.universalRouter();
+        locker = brewFactory_.locker();
+        positionManager = brewFactory_.positionManager();
+    }
+
+    function distribute(uint256 minTokensOut)
+        external
+        nonReentrant
+        returns (uint256 quoteSpent, uint256 tokensBurned)
+    {
+        uint256 deadBalanceBefore = IERC20(token).balanceOf(DEAD);
+        locker.collectAllFees(token);
+        if (locker.claimableFees(address(this), token) > 0) {
+            locker.claimFees(token, DEAD);
+        }
+        if (locker.claimableFees(address(this), quoteToken) > 0) {
+            locker.claimFees(quoteToken, address(this));
+        }
+
+        uint256 quoteBalance = IERC20(quoteToken).balanceOf(address(this));
+        uint256 burnedDirect = IERC20(token).balanceOf(DEAD) - deadBalanceBefore;
+        if (quoteBalance == 0) {
+            if (burnedDirect == 0) revert NothingToDistribute();
+            if (burnedDirect < minTokensOut) revert SlippageExceeded(burnedDirect, minTokensOut);
+            emit DistributedToHolders(msg.sender, 0, burnedDirect);
+            return (0, burnedDirect);
+        }
+        if (quoteBalance > type(uint128).max) revert AmountTooLarge();
+
+        uint256 swapMinTokensOut = burnedDirect >= minTokensOut ? 0 : minTokensOut - burnedDirect;
+        if (swapMinTokensOut > type(uint128).max) revert AmountTooLarge();
+
+        address permit2 = positionManager.permit2();
+        IERC20(quoteToken).forceApprove(permit2, quoteBalance);
+        IPermit2AllowanceTransfer(permit2).approve(quoteToken, universalRouter, uint160(quoteBalance), type(uint48).max);
+
+        V4PoolKey memory poolKey = token < quoteToken
+            ? V4PoolKey({currency0: token, currency1: quoteToken, fee: fee, tickSpacing: tickSpacing, hooks: hooks})
+            : V4PoolKey({currency0: quoteToken, currency1: token, fee: fee, tickSpacing: tickSpacing, hooks: hooks});
+        bytes memory commands = abi.encodePacked(RobinhoodUniversalRouterCommands.V4_SWAP);
+        bytes memory actions = abi.encodePacked(
+            RobinhoodV4SwapActions.SWAP_EXACT_IN_SINGLE,
+            RobinhoodV4SwapActions.SETTLE_ALL,
+            RobinhoodV4SwapActions.TAKE_ALL
+        );
+        bytes[] memory actionParams = new bytes[](3);
+        actionParams[0] = abi.encode(
+            V4ExactInputSingleParams({
+                poolKey: poolKey,
+                zeroForOne: quoteToken == poolKey.currency0,
+                amountIn: uint128(quoteBalance),
+                amountOutMinimum: uint128(swapMinTokensOut),
+                hookData: bytes("")
+            })
+        );
+        actionParams[1] = abi.encode(quoteToken, quoteBalance);
+        actionParams[2] = abi.encode(token, uint256(0));
+        bytes[] memory inputs = new bytes[](1);
+        inputs[0] = abi.encode(actions, actionParams);
+
+        IUniversalRouter(universalRouter).execute(commands, inputs, block.timestamp + 20);
+
+        IPermit2AllowanceTransfer(permit2).approve(quoteToken, universalRouter, 0, 0);
+        IERC20(quoteToken).forceApprove(permit2, 0);
+
+        uint256 leftover = IERC20(quoteToken).balanceOf(address(this));
+        if (leftover > 0) {
+            IERC20(quoteToken).safeTransfer(msg.sender, leftover);
+        }
+
+        quoteSpent = quoteBalance - leftover;
+        tokensBurned = IERC20(token).balanceOf(DEAD) - deadBalanceBefore;
+        if (tokensBurned < minTokensOut) revert SlippageExceeded(tokensBurned, minTokensOut);
+        emit DistributedToHolders(msg.sender, quoteSpent, tokensBurned);
+    }
+}
+
+contract ZeroDistributorFactory {
+    string public constant EAGLE = "launch on eagle.family";
+
+    ZeroFactory public immutable brewFactory;
+
+    mapping(address token => address distributor) public distributorOf;
+
+    event DistributorCreated(address indexed token, address indexed distributor);
+
+    constructor(ZeroFactory brewFactory_) {
+        brewFactory = brewFactory_;
+    }
+
+    function create(address token) public returns (address distributor) {
+        distributor = distributorOf[token];
+        if (distributor != address(0)) return distributor;
+        distributor = address(
+            new ZeroHolderDistributor{salt: bytes32(uint256(uint160(token)))}(brewFactory, token)
+        );
+        distributorOf[token] = distributor;
+        emit DistributorCreated(token, distributor);
+    }
+
+    function distribute(address token, uint256 minTokensOut)
+        external
+        returns (uint256 quoteSpent, uint256 tokensBurned)
+    {
+        return ZeroHolderDistributor(create(token)).distribute(minTokensOut);
+    }
+
+    function predict(address token) external view returns (address) {
+        bytes32 initCodeHash = keccak256(
+            abi.encodePacked(type(ZeroHolderDistributor).creationCode, abi.encode(brewFactory, token))
+        );
+        return address(
+            uint160(
+                uint256(
+                    keccak256(
+                        abi.encodePacked(
+                            bytes1(0xff), address(this), bytes32(uint256(uint160(token))), initCodeHash
+                        )
+                    )
+                )
+            )
+        );
     }
 }

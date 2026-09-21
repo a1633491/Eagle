@@ -41,7 +41,11 @@ async function main() {
     throw new Error('No signer available');
   }
 
-  const eagleFactory = await hre.ethers.getContractAt('EagleFactory', factoryAddress, signer);
+  const eagleFactory = await hre.ethers.getContractAt(
+    'contracts/BrewLaunchSuite.sol:ZeroFactory',
+    factoryAddress,
+    signer,
+  );
   const owner = await eagleFactory.owner();
   const currentFee = await eagleFactory.launchFeeWei();
 

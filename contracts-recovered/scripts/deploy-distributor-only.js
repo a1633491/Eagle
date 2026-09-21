@@ -27,7 +27,9 @@ async function main() {
   console.log(`Deployer: ${deployer.address}`);
   console.log(`Factory: ${eagleFactoryAddress}`);
 
-  const distributorFactoryFactory = await hre.ethers.getContractFactory('EagleDistributorFactory');
+  const distributorFactoryFactory = await hre.ethers.getContractFactory(
+    'contracts/BrewLaunchSuite.sol:ZeroDistributorFactory',
+  );
   const distributorFactory = await distributorFactoryFactory.deploy(eagleFactoryAddress);
   await distributorFactory.waitForDeployment();
 
