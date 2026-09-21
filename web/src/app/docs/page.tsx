@@ -28,19 +28,20 @@ function getDocsContent(lang: Lang, chainKey: ChainKey) {
   const contracts =
     chainKey === 'robinhood'
       ? ([
-          ['EagleFactory', '0x3A4CE33bb65b9429465b6EAda2F29C9f7bF0a122'],
-          ['EagleLiquidityLocker', '0x7DF4EE3EF16856cc2A834860558ac72Dea997641'],
-          ['EagleDistributorFactory', '0x834BEB67eA63d4246BD6B7D1928b2EBD57838F8c'],
-          ['Uni V3 Factory', '0x1f7d7550B1b028f7571E69A784071F0205FD2EfA'],
-          ['Position Manager', '0x73991a25C818Bf1f1128dEAaB1492D45638DE0D3'],
+          ['ZeroFactory', chain.factory ?? '0x2224A3A2e9bC11D3157E9Ab6440BD8AE58bFdF50'],
+          ['ZeroLiquidityLocker', chain.locker ?? '0x5E61D4d688F2a3594f6Ca03BC2d2e37eA8247827'],
+          ['ZeroDistributorFactory', chain.distributorFactory ?? '0x91aa7ADF55c60cfFD2d75c6bF6D9b06648393850'],
+          ['Uniswap V4 PoolManager', '0x8366a39CC670B4001A1121B8F6A443A643e40951'],
+          ['Uniswap V4 Position Manager', '0x58daec3116aae6D93017bAAea7749052E8a04fA7'],
+          ['Universal Router', '0x06AfBA43Fd06227fA663b0DAecF536f6EaA6bf99'],
           ['Wrapped ETH', '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73'],
           ['USDG', '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168'],
         ] as const)
       : chainKey === 'base'
         ? ([
-            ['EagleFactory', '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE'],
-            ['EagleLiquidityLocker', '0x01ec131cF83F2978780D969b79f4839090618187'],
-            ['EagleDistributorFactory', '0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726'],
+            ['ZeroFactory', chain.factory ?? '0x457291634E700971675060560BBFa6eA7dc27176'],
+            ['ZeroLiquidityLocker', chain.locker ?? '0x3649d68F352aCA7934a496Fa1499c0f74f5C4077'],
+            ['ZeroDistributorFactory', chain.distributorFactory ?? '0x4d3AA9f7f10FD370052c17494B2c4dE6B24d20Dc'],
             ['PancakeSwap V3 Factory', '0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865'],
             ['Position Manager', '0x46A15B0b27311cedF172AB29E4f4766fbE7F4364'],
             ['Smart Router', '0x678Aa4bF4E210cf2166753e054d5b7c31cc7fa86'],
@@ -50,18 +51,18 @@ function getDocsContent(lang: Lang, chainKey: ChainKey) {
           ] as const)
         : chainKey === 'arc'
           ? ([
-              ['EagleFactory', chain.factory ?? '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE'],
-              ['EagleLiquidityLocker', chain.locker ?? '0x01ec131cF83F2978780D969b79f4839090618187'],
-              ['EagleDistributorFactory', chain.distributorFactory ?? '0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726'],
+              ['ZeroFactory', chain.factory ?? '0x9D4417CCb6536e82e39dA1f258C79B2928983760'],
+              ['ZeroLiquidityLocker', chain.locker ?? '0xb55624004F0D5eb32D09E2d15C4126433052C0D9'],
+              ['ZeroDistributorFactory', chain.distributorFactory ?? '0x5878fBD635e67cae40A3a1ebf9B01D9AC3BB4915'],
               ['Uni V3 Factory', '0xf0db7b58379503491d857dB50AC9ece64c653918'],
               ['Position Manager', '0x39654A85A4C05127f5Fd6ED22CAeC077A0fB1377'],
               ['Arc native USDC', chain.wrappedNativeToken],
               [chain.stableSymbol, chain.stableToken],
             ] as const)
         : ([
-            ['EagleFactory', '0xEfca26BAc433975a27E894eeD196C8a1D32c4beE'],
-            ['EagleLiquidityLocker', '0x01ec131cF83F2978780D969b79f4839090618187'],
-            ['EagleDistributorFactory', '0x5BD10Eb12669EfCA5c8BF1Bb3d66287783E97726'],
+            ['ZeroFactory', chain.factory ?? '0x9C0E862cD8a3993c8123292E2aD888713759C3f5'],
+            ['ZeroLiquidityLocker', chain.locker ?? '0x3D2Db6ee9731d8f19bd5D77166078a266f3eE820'],
+            ['ZeroDistributorFactory', chain.distributorFactory ?? '0x0e1922bD71BF5f584083E05bDB665aCD7abAe130'],
             ['PancakeSwap V3 Factory', '0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865'],
             ['Position Manager', '0x46A15B0b27311cedF172AB29E4f4766fbE7F4364'],
             ['Smart Router', '0x13f4EA83D0bd40E75C8222255bc855a974568Dd4'],
@@ -93,7 +94,7 @@ function getDocsContent(lang: Lang, chainKey: ChainKey) {
             '设置发射参数：选择创作者费用去向，也可以用配对资产添加一笔可选首购。',
             `连接并发射：连接钱包，切到 ${chainNameZh}，确认发射信息，并预留足够 ${nativeSymbol} 作为链上手续费。`,
           ],
-          notes: ['初始供应量：1,000,000,000 枚 · 18 位小数', '池子交易费：1%', '发射流动性：永久锁定在 Eagle locker'],
+          notes: ['初始供应量：100,000,000,000 枚 · 18 位小数', '池子交易费：1%', '发射流动性：永久锁定在 ZeroLiquidityLocker'],
         },
         {
           id: 'pairing',
@@ -135,7 +136,7 @@ function getDocsContent(lang: Lang, chainKey: ChainKey) {
           steps: [
             '发射后还能改名称或 Ticker 吗？不能，确认前请检查清楚。',
             '为什么新交易没有 USD 价格？数据提供方在历史 USD 数据索引完成前可能会有延迟。',
-            '创作者可以移除发射流动性吗？不能，发射头寸会永久保存在 EagleLiquidityLocker。',
+            '创作者可以移除发射流动性吗？不能，发射头寸会永久保存在 ZeroLiquidityLocker。',
           ],
         },
       ],
@@ -165,7 +166,7 @@ function getDocsContent(lang: Lang, chainKey: ChainKey) {
             'ローンチ設定を決める: クリエイター手数料の受け取り先を選び、必要ならペア資産で初回購入も追加できます。',
             `接続してローンチ: ウォレットを接続し、${chainNameJa} に切り替えて内容を確認します。ネットワーク手数料用に ${nativeSymbol} を残しておいてください。`,
           ],
-          notes: ['初期供給量: 1,000,000,000 トークン · 18 decimals', 'ローンチプール手数料: 1%', 'ローンチ流動性: Eagle locker に永久ロック'],
+          notes: ['初期供給量: 100,000,000,000 トークン · 18 decimals', 'ローンチプール手数料: 1%', 'ローンチ流動性: ZeroLiquidityLocker に永久ロック'],
         },
         {
           id: 'pairing',
@@ -207,7 +208,7 @@ function getDocsContent(lang: Lang, chainKey: ChainKey) {
           steps: [
             'ローンチ後に名前やティッカーを変更できますか？ できません。確認前によくチェックしてください。',
             '新しい取引に USD 価格がないのはなぜですか？ 履歴 USD データのインデックス完了までプロバイダーに遅延が生じることがあります。',
-            'クリエイターはローンチ流動性を引き出せますか？ できません。ポジションは EagleLiquidityLocker に永久保存されます。',
+            'クリエイターはローンチ流動性を引き出せますか？ できません。ポジションは ZeroLiquidityLocker に永久保存されます。',
           ],
         },
       ],
@@ -237,9 +238,9 @@ function getDocsContent(lang: Lang, chainKey: ChainKey) {
           `Connect and launch: Connect your wallet, switch to ${chainNameEn} and confirm the launch details. Keep ${nativeSymbol} available for network fees.`,
         ],
         notes: [
-          'Initial supply: 1,000,000,000 tokens · 18 decimals',
+          'Initial supply: 100,000,000,000 tokens · 18 decimals',
           'Launch pool fee: 1% on trades through this pool',
-          'Launch liquidity: Locked permanently in Eagle’s locker',
+          'Launch liquidity: Locked permanently in ZeroLiquidityLocker',
         ],
       },
       {
@@ -288,7 +289,7 @@ function getDocsContent(lang: Lang, chainKey: ChainKey) {
         steps: [
           'Can I change my name or ticker after launch? No, check them before confirming your launch.',
           'Why are new trades missing USD values? Providers can lag before historical USD price data finishes indexing.',
-          'Can the creator remove the launch liquidity? No. The launch positions stay in EagleLiquidityLocker permanently.',
+          'Can the creator remove the launch liquidity? No. The launch positions stay in ZeroLiquidityLocker permanently.',
         ],
       },
     ],

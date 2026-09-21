@@ -52,12 +52,7 @@ const config = {
     },
   },
   etherscan: {
-    apiKey: {
-      bsc: process.env.BSCSCAN_API_KEY || '',
-      base: process.env.ETHERSCAN_API_KEY || process.env.BASESCAN_API_KEY || '',
-      robinhood: process.env.ROBINHOODSCAN_API_KEY || '',
-      arc: process.env.ARCSCAN_API_KEY || '',
-    },
+    apiKey: process.env.ETHERSCAN_API_KEY || process.env.BSCSCAN_API_KEY || process.env.BASESCAN_API_KEY || '',
     customChains: [
       {
         network: 'base',
@@ -86,7 +81,7 @@ const config = {
     ],
   },
   sourcify: {
-    enabled: true,
+    enabled: false,
   },
 };
 
