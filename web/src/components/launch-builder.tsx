@@ -252,19 +252,19 @@ function BrewSectionHeading({
 }) {
   return (
     <div className='mb-6 flex items-start justify-between gap-3 sm:mb-8 sm:gap-4'>
-      <div className='flex min-w-0 items-start gap-4 sm:gap-5'>
-        <div className='flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] border border-white/8 bg-[#1b1d1a] text-[#dcca96] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:h-16 sm:w-16 sm:rounded-[20px]'>
+      <div className='flex min-w-0 flex-1 items-start gap-3 sm:gap-5'>
+        <div className='flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border border-white/8 bg-[#1b1d1a] text-[#dcca96] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:h-16 sm:w-16 sm:rounded-[20px]'>
           {icon}
         </div>
-        <div className='min-w-0 pt-1'>
+        <div className='min-w-0 pt-0.5 sm:pt-1'>
           <div className='flex flex-wrap items-center gap-2'>
-            <h2 className='text-[1.3rem] font-semibold tracking-[-0.05em] text-[#f3f1e8] sm:text-[1.75rem]'>{title}</h2>
-            {optional ? <span className='text-sm text-[#8b9186]'>{optionalLabel}</span> : null}
+            <h2 className='text-[1.15rem] font-semibold tracking-[-0.05em] text-[#f3f1e8] sm:text-[1.75rem]'>{title}</h2>
+            {optional ? <span className='text-xs text-[#8b9186] sm:text-sm'>{optionalLabel}</span> : null}
           </div>
-          <p className='mt-2 text-sm leading-7 text-[#8e9488] sm:text-[15px] sm:leading-8'>{description}</p>
+          <p className='mt-1.5 text-[13px] leading-6 text-[#8e9488] sm:mt-2 sm:text-[15px] sm:leading-8'>{description}</p>
         </div>
       </div>
-      <span className='pt-1 text-[1.4rem] font-medium tracking-[-0.06em] text-[#8b9186] sm:pt-2 sm:text-[2rem]'>{step}</span>
+      <span className='shrink-0 pt-0.5 text-[1.1rem] font-medium tracking-[-0.06em] text-[#8b9186] sm:pt-2 sm:text-[2rem]'>{step}</span>
     </div>
   );
 }
@@ -436,19 +436,19 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
   }
 
   return (
-    <div className='space-y-6'>
-      <div className='space-y-6'>
-        <div className='max-w-4xl space-y-3'>
+    <div className='space-y-5 sm:space-y-6'>
+      <div className='space-y-5 sm:space-y-6'>
+        <div className='max-w-4xl space-y-2.5 sm:space-y-3'>
           <p className='text-[11px] font-medium uppercase tracking-[0.22em] text-[#7f8779]'>{locale.pageEyebrow}</p>
-          <h1 className='max-w-5xl text-[2.2rem] font-semibold tracking-[-0.07em] text-[#f3f1e8] sm:text-[3rem]'>
+          <h1 className='max-w-5xl text-[1.9rem] font-semibold leading-[1.05] tracking-[-0.07em] text-[#f3f1e8] sm:text-[3rem]'>
             {locale.pageTitle}
           </h1>
-          <p className='max-w-4xl text-[15px] leading-8 text-[#8e9488]'>{locale.pageSubtitle}</p>
+          <p className='max-w-4xl text-[14px] leading-7 text-[#8e9488] sm:text-[15px] sm:leading-8'>{locale.pageSubtitle}</p>
         </div>
       </div>
 
-      <div className='space-y-6'>
-          <section className='rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[34px] sm:p-8'>
+      <div className='space-y-5 sm:space-y-6'>
+          <section className='rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[34px] sm:p-8'>
             <BrewSectionHeading
               step='01'
               title={t(lang, 'startWithStory')}
@@ -457,14 +457,14 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
               optionalLabel={t(lang, 'optional')}
             />
 
-            <div className='grid gap-7 lg:grid-cols-[280px_minmax(0,1fr)]'>
+            <div className='grid gap-6 sm:gap-7 lg:grid-cols-[280px_minmax(0,1fr)]'>
               <div>
                 <FieldLabel label={t(lang, 'addTokenImage')} required />
                 <div
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`flex min-h-[236px] flex-col items-center justify-center rounded-[26px] border border-dashed px-5 py-7 text-center transition ${
+                  className={`flex min-h-[220px] flex-col items-center justify-center rounded-[22px] border border-dashed px-4 py-6 text-center transition sm:min-h-[236px] sm:rounded-[26px] sm:px-5 sm:py-7 ${
                     isDragActive ? 'border-[#e7d08d66] bg-[#1e1f1b]' : 'border-[#5d5640] bg-[#1a1b18]'
                   }`}
                 >
@@ -480,8 +480,8 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
                       <Upload className='h-6 w-6' />
                     </div>
                   )}
-                  <p className='text-[1.15rem] font-medium text-[#f3f1e8]'>{t(lang, 'addTokenImage')} *</p>
-                  <p className='mt-3 text-sm leading-7 text-[#9aa091]'>{locale.dragAndDrop}</p>
+                  <p className='text-[1.05rem] font-medium text-[#f3f1e8] sm:text-[1.15rem]'>{t(lang, 'addTokenImage')} *</p>
+                  <p className='mt-3 text-sm leading-6 text-[#9aa091] sm:leading-7'>{locale.dragAndDrop}</p>
                   <p className='mt-5 text-xs text-[#8b9186]'>{locale.dropHint}</p>
                   <button
                     type='button'
@@ -503,7 +503,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
                 </div>
               </div>
 
-              <div className='space-y-6'>
+              <div className='space-y-5 sm:space-y-6'>
                 <div>
                   <FieldLabel label={t(lang, 'tokenName')} required />
                   <input
@@ -533,7 +533,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
               </div>
             </div>
 
-            <div className='mt-8'>
+            <div className='mt-7 sm:mt-8'>
               <FieldLabel label={t(lang, 'yourStory')} count={story.length} max={STORY_MAX} />
               <textarea
                 id='story'
@@ -541,21 +541,21 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
                 maxLength={STORY_MAX}
                 onChange={(event) => setStory(event.target.value)}
                 placeholder={locale.storyPlaceholder}
-                className='min-h-[150px] w-full rounded-[20px] border border-white/6 bg-[#10120f] px-5 py-4 text-[1rem] leading-8 text-[#f3f1e8] outline-none placeholder:text-[#646b60]'
+                className='min-h-[140px] w-full rounded-[18px] border border-white/6 bg-[#10120f] px-4 py-4 text-[0.98rem] leading-7 text-[#f3f1e8] outline-none placeholder:text-[#646b60] sm:min-h-[150px] sm:rounded-[20px] sm:px-5 sm:text-[1rem] sm:leading-8'
               />
             </div>
 
-            <div className='mt-8 border-t border-white/6 pt-6'>
+            <div className='mt-7 border-t border-white/6 pt-6 sm:mt-8'>
               <details className='group'>
                 <summary className='flex cursor-pointer list-none items-center justify-between gap-4 text-left'>
-                  <div className='flex items-center gap-3 text-[1.1rem] text-[#d6d7cf]'>
-                    <span className='text-[1.4rem] text-[#cdb57b]'>+</span>
+                  <div className='flex min-w-0 items-center gap-3 text-[1rem] text-[#d6d7cf] sm:text-[1.1rem]'>
+                    <span className='shrink-0 text-[1.35rem] text-[#cdb57b] sm:text-[1.4rem]'>+</span>
                     <span>{t(lang, 'addWebsiteSocial')}</span>
-                    <span className='text-sm text-[#8b9186]'>{t(lang, 'optional')}</span>
+                    <span className='shrink-0 text-xs text-[#8b9186] sm:text-sm'>{t(lang, 'optional')}</span>
                   </div>
                   <ChevronDown className='h-5 w-5 text-[#8b9186] transition group-open:rotate-180' />
                 </summary>
-                <div className='mt-6 grid gap-4 lg:grid-cols-3'>
+                <div className='mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3'>
                   <div>
                     <FieldLabel label={locale.websiteLabel} count={websiteUrl.length} max={URL_MAX} />
                     <div className='relative'>
@@ -600,7 +600,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
             </div>
           </section>
 
-          <section className='rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[34px] sm:p-8'>
+          <section className='rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[34px] sm:p-8'>
             <BrewSectionHeading
               step='02'
               title={t(lang, 'findPerfectPair')}
@@ -609,8 +609,8 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
               optionalLabel={t(lang, 'optional')}
             />
 
-            <div className='rounded-[26px] border border-white/8 bg-[#1c1d19] p-3'>
-              <div className='grid gap-3 md:grid-cols-2'>
+            <div className='rounded-[22px] border border-white/8 bg-[#1c1d19] p-3 sm:rounded-[26px]'>
+              <div className='grid gap-3 sm:grid-cols-2'>
                 {[
                   ['single', locale.singlePool, 'a single pool'],
                   ['multi', locale.multiPool, '2 pools'],
@@ -621,13 +621,13 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
                       key={value}
                       type='button'
                       onClick={() => setPoolMode(value as 'single' | 'multi')}
-                      className={`rounded-[20px] border px-6 py-6 text-center transition ${
+                      className={`rounded-[18px] border px-4 py-5 text-center transition sm:rounded-[20px] sm:px-6 sm:py-6 ${
                         active
                           ? 'border-[#8a7747] bg-[radial-gradient(circle_at_top,rgba(182,153,89,0.18),rgba(182,153,89,0)_60%),#2a2923] text-[#f3e0a6]'
                           : 'border-transparent bg-transparent text-[#d5d6cf]'
                       }`}
                     >
-                      <div className='text-[1.15rem] font-medium'>{label}</div>
+                      <div className='text-[1.05rem] font-medium sm:text-[1.15rem]'>{label}</div>
                       <div className='mt-2 text-sm text-[#9a9d91]'>{caption}</div>
                     </button>
                   );
@@ -635,7 +635,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
               </div>
             </div>
 
-            <div className='mt-8 grid gap-4 lg:grid-cols-3'>
+            <div className='mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3'>
               {localizedPairOptions.map((option) => {
                 const active = option.key === pair;
                 return (
@@ -643,7 +643,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
                     key={option.key}
                     type='button'
                     onClick={() => setPair(option.key)}
-                    className={`rounded-[22px] border px-6 py-7 text-left transition ${
+                    className={`rounded-[20px] border px-5 py-6 text-left transition sm:rounded-[22px] sm:px-6 sm:py-7 ${
                       active
                         ? 'border-[#8a7747] bg-[radial-gradient(circle_at_top,rgba(182,153,89,0.18),rgba(182,153,89,0)_60%),#2a2923] text-[#f3e0a6]'
                         : 'border-white/8 bg-[#1b1c18] text-[#f3f1e8]'
@@ -654,7 +654,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
                         <span className='text-lg'>{option.icon || '◎'}</span>
                       </div>
                       <div className='min-w-0'>
-                        <div className='flex items-center gap-3 text-[1rem] font-medium'>
+                        <div className='flex flex-wrap items-center gap-2 text-[1rem] font-medium'>
                           <span>{option.label}</span>
                           {option.subtitle ? <span className='text-[#8e9488]'>{option.subtitle}</span> : null}
                         </div>
@@ -671,9 +671,9 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
                   <div className='text-sm text-[#8b9186]'>{locale.tradingPair}</div>
                   <div className='mt-2 text-[1.2rem] font-medium text-[#e7d08d]'>${ticker || locale.tickerPlaceholder} / {pairLabel}</div>
                 </div>
-                <div className='text-right text-[#8b9186]'>
+                <div className='text-left text-[#8b9186] sm:text-right'>
                   <div className='text-sm'>{chain.name}</div>
-                  <div className='mt-2 text-[1.6rem] tracking-[-0.06em] sm:text-[2rem]'>ID {chain.chainId}</div>
+                  <div className='mt-1 text-[1.45rem] tracking-[-0.06em] sm:mt-2 sm:text-[2rem]'>ID {chain.chainId}</div>
                 </div>
               </div>
 
@@ -706,17 +706,17 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
                 </div>
               ) : null}
 
-              <div className='mt-6 flex flex-col items-start gap-3 text-[15px] text-[#8b9186] sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
+              <div className='mt-6 flex flex-col items-start gap-2.5 text-[14px] text-[#8b9186] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:text-[15px]'>
                 <div className='flex items-center gap-3'>
                   <span className='h-2.5 w-2.5 rounded-full bg-[#d8c483]' />
                   <span>{chain.name} mainnet · Chain {chain.chainId}</span>
                 </div>
-                <span className='hidden sm:inline'>{poolMode === 'single' ? locale.singlePool : locale.multiPool}</span>
+                <span>{poolMode === 'single' ? locale.singlePool : locale.multiPool}</span>
               </div>
             </div>
           </section>
 
-          <section className='rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[34px] sm:p-8'>
+          <section className='rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[34px] sm:p-8'>
             <BrewSectionHeading
               step='03'
               title={t(lang, 'setYourLaunch')}
@@ -726,11 +726,11 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
               optionalLabel={t(lang, 'optional')}
             />
 
-            <div className='grid gap-4 lg:grid-cols-2'>
+            <div className='grid gap-4 sm:grid-cols-2'>
               <button
                 type='button'
                 onClick={() => setFeeTarget('wallet')}
-                className={`rounded-[22px] border px-5 py-6 text-left transition ${
+                className={`rounded-[20px] border px-5 py-6 text-left transition sm:rounded-[22px] ${
                   feeTarget === 'wallet'
                     ? 'border-[#8a7747] bg-[radial-gradient(circle_at_top,rgba(182,153,89,0.18),rgba(182,153,89,0)_60%),#2a2923]'
                     : 'border-white/8 bg-[#1a1b18]'
@@ -749,7 +749,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
               <button
                 type='button'
                 onClick={() => setFeeTarget('holders')}
-                className={`rounded-[22px] border px-5 py-6 text-left transition ${
+                className={`rounded-[20px] border px-5 py-6 text-left transition sm:rounded-[22px] ${
                   feeTarget === 'holders'
                     ? 'border-[#8a7747] bg-[radial-gradient(circle_at_top,rgba(182,153,89,0.18),rgba(182,153,89,0)_60%),#2a2923]'
                     : 'border-white/8 bg-[#1a1b18]'

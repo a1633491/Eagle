@@ -840,32 +840,32 @@ export function LaunchSubmitActions({
   return (
     <div className='space-y-4'>
       <div className='grid gap-3 rounded-[14px] border border-white/8 bg-[#171916] p-3 text-sm'>
-        <div className='flex items-center justify-between gap-4'>
+        <div className='flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
           <span className='text-[#8f9482]'>{locale.platformFee}</span>
           <span className='text-[#f3f1e8]'>{launchFeeText} {chain.nativeSymbol}</span>
         </div>
-        <div className='flex items-center justify-between gap-4'>
+        <div className='flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
           <span className='text-[#8f9482]'>Default start</span>
           <span className='text-[#f3f1e8]'>${defaultLaunchConfig.targetLaunchPriceUsd}</span>
         </div>
-        <div className='flex items-center justify-between gap-4'>
+        <div className='flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
           <span className='text-[#8f9482]'>{locale.firstBuyAmount}</span>
           <span className='text-[#f3f1e8]'>{firstBuyText}</span>
         </div>
-        <div className='flex items-center justify-between gap-4'>
+        <div className='flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
           <span className='text-[#8f9482]'>{locale.quoteTokenAddress}</span>
-          <span className='max-w-[60%] truncate text-right text-[#f3f1e8]'>
+          <span className='w-full text-left text-[#f3f1e8] sm:max-w-[60%] sm:truncate sm:text-right'>
             {resolvedQuoteToken ?? (pair === 'ANY' ? locale.customQuoteHint : '—')}
           </span>
         </div>
-        <div className='flex items-center justify-between gap-4'>
+        <div className='flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
           <span className='text-[#8f9482]'>{locale.predictedToken}</span>
-          <span className='max-w-[60%] truncate text-right text-[#f3f1e8]'>{resolvedPredictedTokenAddress ?? '—'}</span>
+          <span className='w-full text-left text-[#f3f1e8] sm:max-w-[60%] sm:truncate sm:text-right'>{resolvedPredictedTokenAddress ?? '—'}</span>
         </div>
         {feeTarget === 'holders' ? (
-          <div className='flex items-center justify-between gap-4'>
+          <div className='flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
             <span className='text-[#8f9482]'>{locale.distributor}</span>
-            <span className='max-w-[60%] truncate text-right text-[#f3f1e8]'>{resolvedPredictedDistributorAddress ?? '—'}</span>
+            <span className='w-full text-left text-[#f3f1e8] sm:max-w-[60%] sm:truncate sm:text-right'>{resolvedPredictedDistributorAddress ?? '—'}</span>
           </div>
         ) : null}
       </div>
