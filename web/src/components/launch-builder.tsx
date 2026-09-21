@@ -251,20 +251,20 @@ function BrewSectionHeading({
   optionalLabel?: string;
 }) {
   return (
-    <div className='mb-8 flex items-start justify-between gap-4'>
+    <div className='mb-6 flex items-start justify-between gap-3 sm:mb-8 sm:gap-4'>
       <div className='flex min-w-0 items-start gap-4 sm:gap-5'>
-        <div className='flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] border border-white/8 bg-[#1b1d1a] text-[#dcca96] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+        <div className='flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] border border-white/8 bg-[#1b1d1a] text-[#dcca96] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:h-16 sm:w-16 sm:rounded-[20px]'>
           {icon}
         </div>
         <div className='min-w-0 pt-1'>
           <div className='flex flex-wrap items-center gap-2'>
-            <h2 className='text-[1.75rem] font-semibold tracking-[-0.05em] text-[#f3f1e8]'>{title}</h2>
+            <h2 className='text-[1.3rem] font-semibold tracking-[-0.05em] text-[#f3f1e8] sm:text-[1.75rem]'>{title}</h2>
             {optional ? <span className='text-sm text-[#8b9186]'>{optionalLabel}</span> : null}
           </div>
-          <p className='mt-2 text-[15px] leading-8 text-[#8e9488]'>{description}</p>
+          <p className='mt-2 text-sm leading-7 text-[#8e9488] sm:text-[15px] sm:leading-8'>{description}</p>
         </div>
       </div>
-      <span className='pt-2 text-[2rem] font-medium tracking-[-0.06em] text-[#8b9186]'>{step}</span>
+      <span className='pt-1 text-[1.4rem] font-medium tracking-[-0.06em] text-[#8b9186] sm:pt-2 sm:text-[2rem]'>{step}</span>
     </div>
   );
 }
@@ -291,6 +291,15 @@ function FieldLabel({
           {count}/{max}
         </span>
       ) : null}
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className='flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
+      <span className='text-[#8b9186]'>{label}</span>
+      <span className='w-full text-left text-[#f3f1e8] sm:w-auto sm:max-w-[65%] sm:text-right'>{value}</span>
     </div>
   );
 }
@@ -368,6 +377,65 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
   const socialReadyText = [websiteUrl, twitterUrl, telegramUrl].filter(Boolean).length
     ? [websiteUrl && locale.websiteLabel, twitterUrl && locale.xLabel, telegramUrl && locale.telegramLabel].filter(Boolean).join(' / ')
     : locale.noLinksYet;
+  const previewPanel = (
+    <section className='rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[34px] sm:p-6'>
+      <div className='mb-5 flex items-start justify-between gap-4'>
+        <div>
+          <p className='text-xs font-medium uppercase tracking-[0.18em] text-[#7f8779]'>{locale.livePreviewPanel}</p>
+          <p className='mt-2 text-sm leading-7 text-[#8e9488]'>{locale.realtimePreview}</p>
+        </div>
+        <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1 text-xs text-[#f1e4b7]'>
+          {t(lang, 'preLaunch')}
+        </span>
+      </div>
+
+      <div className='rounded-[24px] border border-white/8 bg-[#10130f] p-4 sm:rounded-[26px] sm:p-6'>
+        <div className='rounded-[22px] border border-white/8 bg-[radial-gradient(circle_at_bottom,rgba(101,92,255,0.24),rgba(16,19,15,0)_45%),#131712] p-4 sm:rounded-[24px] sm:p-5'>
+          <div className='flex items-start gap-4'>
+            {imagePreviewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={imagePreviewUrl} alt='Token preview' className='h-16 w-16 rounded-[18px] border border-white/10 object-cover sm:h-20 sm:w-20 sm:rounded-[22px]' />
+            ) : (
+              <div className='flex h-16 w-16 items-center justify-center rounded-[18px] border border-white/10 bg-[#191d19] text-[#f1e4b7] sm:h-20 sm:w-20 sm:rounded-[22px]'>
+                <Upload className='h-6 w-6 sm:h-7 sm:w-7' />
+              </div>
+            )}
+            <div className='min-w-0 flex-1'>
+              <div className='text-xs uppercase tracking-[0.18em] text-[#737a6d]'>{locale.previewCardHint}</div>
+              <h3 className='mt-3 truncate text-[1.35rem] font-semibold tracking-[-0.06em] text-[#f3f1e8] sm:text-[1.6rem]'>
+                {name || locale.yourTokenName}
+              </h3>
+              <div className='mt-2 flex flex-wrap items-center gap-2 text-sm text-[#c2c8bd]'>
+                <span>${ticker || 'TICKER'}</span>
+                <span className='text-[#5f665b]'>/</span>
+                <span>{pairLabel}</span>
+              </div>
+            </div>
+          </div>
+
+          <p className='mt-5 min-h-[72px] text-sm leading-7 text-[#8e9488] sm:min-h-[84px]'>
+            {story || locale.previewStory}
+          </p>
+
+          <div className='mt-5 grid gap-3 rounded-[18px] border border-white/8 bg-[#0d0f0d] p-4 text-sm sm:rounded-[20px]'>
+            <InfoRow label={locale.previewPair} value={`$${ticker || 'TICKER'} / ${pairLabel}`} />
+            <InfoRow label={locale.previewChain} value={chain.name} />
+            <InfoRow label={locale.previewStatus} value={t(lang, 'preLaunch')} />
+            <InfoRow label={locale.previewPoolMode} value={poolMode === 'single' ? locale.singlePool : locale.multiPool} />
+          </div>
+
+          <div className='mt-5 flex flex-wrap gap-2 text-xs'>
+            {websiteUrl ? <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#f1e4b7]'>{locale.websiteLabel}</span> : null}
+            {twitterUrl ? <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#f1e4b7]'>{locale.xLabel}</span> : null}
+            {telegramUrl ? <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#f1e4b7]'>{locale.telegramLabel}</span> : null}
+            {!websiteUrl && !twitterUrl && !telegramUrl ? (
+              <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#737a6d]'>{locale.noLinksYet}</span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -461,9 +529,13 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
         </div>
       </div>
 
+      <div className='xl:hidden'>
+        {previewPanel}
+      </div>
+
       <div className='grid gap-6 xl:grid-cols-[minmax(0,58fr)_minmax(360px,42fr)]'>
         <div className='space-y-6'>
-          <section className='rounded-[34px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-8'>
+          <section className='rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[34px] sm:p-8'>
             <BrewSectionHeading
               step='01'
               title={t(lang, 'startWithStory')}
@@ -615,7 +687,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
             </div>
           </section>
 
-          <section className='rounded-[34px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-8'>
+          <section className='rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[34px] sm:p-8'>
             <BrewSectionHeading
               step='02'
               title={t(lang, 'findPerfectPair')}
@@ -681,14 +753,14 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
             </div>
 
             <div className='mt-8 border-t border-white/6 pt-6'>
-              <div className='flex items-end justify-between gap-4'>
+              <div className='flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between'>
                 <div>
                   <div className='text-sm text-[#8b9186]'>{locale.tradingPair}</div>
                   <div className='mt-2 text-[1.2rem] font-medium text-[#e7d08d]'>${ticker || locale.tickerPlaceholder} / {pairLabel}</div>
                 </div>
                 <div className='text-right text-[#8b9186]'>
                   <div className='text-sm'>{chain.name}</div>
-                  <div className='mt-2 text-[2rem] tracking-[-0.06em]'>ID {chain.chainId}</div>
+                  <div className='mt-2 text-[1.6rem] tracking-[-0.06em] sm:text-[2rem]'>ID {chain.chainId}</div>
                 </div>
               </div>
 
@@ -721,7 +793,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
                 </div>
               ) : null}
 
-              <div className='mt-6 flex items-center justify-between gap-4 text-[15px] text-[#8b9186]'>
+              <div className='mt-6 flex flex-col items-start gap-3 text-[15px] text-[#8b9186] sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
                 <div className='flex items-center gap-3'>
                   <span className='h-2.5 w-2.5 rounded-full bg-[#d8c483]' />
                   <span>{chain.name} mainnet · Chain {chain.chainId}</span>
@@ -731,7 +803,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
             </div>
           </section>
 
-          <section className='rounded-[34px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-8'>
+          <section className='rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[34px] sm:p-8'>
             <BrewSectionHeading
               step='03'
               title={t(lang, 'setYourLaunch')}
@@ -808,7 +880,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
             </div>
           </section>
 
-          <section className='rounded-[34px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-6 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-8'>
+          <section className='rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[34px] sm:p-8'>
             <BrewSectionHeading
               step='04'
               title={t(lang, 'reviewAndCreate')}
@@ -818,19 +890,10 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
 
             <div className='grid gap-3 rounded-[20px] border border-white/8 bg-[#151613] p-4 text-sm'>
               {reviewRows.map((row) => (
-                <div key={row.label} className='flex items-center justify-between gap-4'>
-                  <span className='text-[#8b9186]'>{row.label}</span>
-                  <span className='max-w-[65%] text-right text-[#f3f1e8]'>{row.value}</span>
-                </div>
+                <InfoRow label={row.label} value={row.value} key={row.label} />
               ))}
-              <div className='flex items-center justify-between gap-4'>
-                <span className='text-[#8b9186]'>{t(lang, 'firstPurchase')}</span>
-                <span className='text-[#f3f1e8]'>{firstBuy || '0.00'} {pairLabel}</span>
-              </div>
-              <div className='flex items-center justify-between gap-4'>
-                <span className='text-[#8b9186]'>{locale.socialLinks}</span>
-                <span className='max-w-[65%] text-right text-[#f3f1e8]'>{socialReadyText}</span>
-              </div>
+              <InfoRow label={t(lang, 'firstPurchase')} value={`${firstBuy || '0.00'} ${pairLabel}`} />
+              <InfoRow label={locale.socialLinks} value={socialReadyText} />
             </div>
 
             <div className='mt-6'>
@@ -858,76 +921,8 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
           </section>
         </div>
 
-        <aside className='min-w-0 xl:sticky xl:top-24 xl:self-start'>
-          <section className='rounded-[34px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:p-6'>
-            <div className='mb-5 flex items-start justify-between gap-4'>
-              <div>
-                <p className='text-xs font-medium uppercase tracking-[0.18em] text-[#7f8779]'>{locale.livePreviewPanel}</p>
-                <p className='mt-2 text-sm leading-7 text-[#8e9488]'>{locale.realtimePreview}</p>
-              </div>
-              <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1 text-xs text-[#f1e4b7]'>
-                {t(lang, 'preLaunch')}
-              </span>
-            </div>
-
-            <div className='rounded-[26px] border border-white/8 bg-[#10130f] p-5 sm:p-6'>
-              <div className='rounded-[24px] border border-white/8 bg-[radial-gradient(circle_at_bottom,rgba(101,92,255,0.24),rgba(16,19,15,0)_45%),#131712] p-5'>
-                <div className='flex items-start gap-4'>
-                  {imagePreviewUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={imagePreviewUrl} alt='Token preview' className='h-20 w-20 rounded-[22px] border border-white/10 object-cover' />
-                  ) : (
-                    <div className='flex h-20 w-20 items-center justify-center rounded-[22px] border border-white/10 bg-[#191d19] text-[#f1e4b7]'>
-                      <Upload className='h-7 w-7' />
-                    </div>
-                  )}
-                  <div className='min-w-0 flex-1'>
-                    <div className='text-xs uppercase tracking-[0.18em] text-[#737a6d]'>{locale.previewCardHint}</div>
-                    <h3 className='mt-3 truncate text-[1.6rem] font-semibold tracking-[-0.06em] text-[#f3f1e8]'>
-                      {name || locale.yourTokenName}
-                    </h3>
-                    <div className='mt-2 flex flex-wrap items-center gap-2 text-sm text-[#c2c8bd]'>
-                      <span>${ticker || 'TICKER'}</span>
-                      <span className='text-[#5f665b]'>/</span>
-                      <span>{pairLabel}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <p className='mt-5 min-h-[84px] text-sm leading-7 text-[#8e9488]'>
-                  {story || locale.previewStory}
-                </p>
-
-                <div className='mt-5 grid gap-3 rounded-[20px] border border-white/8 bg-[#0d0f0d] p-4 text-sm'>
-                  <div className='flex items-center justify-between gap-4'>
-                    <span className='text-[#737a6d]'>{locale.previewPair}</span>
-                    <span className='text-[#f3f1e8]'>${ticker || 'TICKER'} / {pairLabel}</span>
-                  </div>
-                  <div className='flex items-center justify-between gap-4'>
-                    <span className='text-[#737a6d]'>{locale.previewChain}</span>
-                    <span className='text-[#f3f1e8]'>{chain.name}</span>
-                  </div>
-                  <div className='flex items-center justify-between gap-4'>
-                    <span className='text-[#737a6d]'>{locale.previewStatus}</span>
-                    <span className='text-[#f3f1e8]'>{t(lang, 'preLaunch')}</span>
-                  </div>
-                  <div className='flex items-center justify-between gap-4'>
-                    <span className='text-[#737a6d]'>{locale.previewPoolMode}</span>
-                    <span className='text-[#f3f1e8]'>{poolMode === 'single' ? locale.singlePool : locale.multiPool}</span>
-                  </div>
-                </div>
-
-                <div className='mt-5 flex flex-wrap gap-2 text-xs'>
-                  {websiteUrl ? <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#f1e4b7]'>{locale.websiteLabel}</span> : null}
-                  {twitterUrl ? <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#f1e4b7]'>{locale.xLabel}</span> : null}
-                  {telegramUrl ? <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#f1e4b7]'>{locale.telegramLabel}</span> : null}
-                  {!websiteUrl && !twitterUrl && !telegramUrl ? (
-                    <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#737a6d]'>{locale.noLinksYet}</span>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          </section>
+        <aside className='hidden min-w-0 xl:sticky xl:top-24 xl:block xl:self-start'>
+          {previewPanel}
         </aside>
       </div>
     </div>
