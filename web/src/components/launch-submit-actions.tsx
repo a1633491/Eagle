@@ -832,36 +832,35 @@ export function LaunchSubmitActions({
       : locale.launchNow;
 
   const primaryAction = isWrongNetwork ? handleSwitchNetwork : approvalSatisfied ? handleLaunch : handleApprove;
+  const helperText = !isConnected
+    ? ''
+    : isWrongNetwork
+      ? locale.switchNetworkFirst
+      : holderFeeUnsupported
+        ? locale.robinhoodWalletFeesOnly
+      : firstBuyUnsupported
+        ? locale.robinhoodFirstBuyDisabled
+      : launchFeeUnavailable
+        ? locale.loadingLaunchFee
+      : !name.trim() || !ticker.trim() || !resolvedQuoteToken || firstBuyAmount === undefined
+        ? locale.missingFields
+      : imageUploading
+        ? locale.imageUploading
+      : quotePriceLoading
+        ? locale.loadingQuotePrice
+      : quoteUsdPrice === undefined
+        ? locale.quotePriceUnavailable
+      : !metadataUri
+        ? locale.metadataTooLarge
+      : parsedTotalSupply === undefined || parsedInitialTick === undefined || parsedInitialBuyMinTokensOut === undefined || !tickAligned
+        ? locale.invalidParams
+      : feeTarget === 'holders' && !resolvedPredictedDistributorAddress
+        ? locale.holdersPending
+      : locale.launchReady;
 
   return (
     <div className='space-y-4'>
-      <p className='text-sm leading-7 text-[#8f9482]'>
-        {!isConnected
-          ? locale.walletRequired
-          : isWrongNetwork
-            ? locale.switchNetworkFirst
-          : holderFeeUnsupported
-            ? locale.robinhoodWalletFeesOnly
-          : firstBuyUnsupported
-            ? locale.robinhoodFirstBuyDisabled
-          : launchFeeUnavailable
-            ? locale.loadingLaunchFee
-          : !name.trim() || !ticker.trim() || !resolvedQuoteToken || firstBuyAmount === undefined
-            ? locale.missingFields
-            : imageUploading
-              ? locale.imageUploading
-            : quotePriceLoading
-              ? locale.loadingQuotePrice
-            : quoteUsdPrice === undefined
-              ? locale.quotePriceUnavailable
-            : !metadataUri
-              ? locale.metadataTooLarge
-          : parsedTotalSupply === undefined || parsedInitialTick === undefined || parsedInitialBuyMinTokensOut === undefined || !tickAligned
-            ? locale.invalidParams
-          : feeTarget === 'holders' && !resolvedPredictedDistributorAddress
-            ? locale.holdersPending
-          : locale.launchReady}
-      </p>
+      {helperText ? <p className='text-sm leading-7 text-[#8f9482]'>{helperText}</p> : null}
       {metadataCompacted && metadataUri ? (
         <p className='text-xs text-[#8f9482]'>{locale.metadataCompacted}</p>
       ) : null}
