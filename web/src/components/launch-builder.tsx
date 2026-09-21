@@ -1,12 +1,11 @@
 'use client';
 
-import Link from 'next/link';
-import { Globe, ImagePlus, Plus, Search, Triangle } from 'lucide-react';
-import { useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { ChevronDown, Globe, ImagePlus, Link2, MessageCircle, Upload } from 'lucide-react';
+import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { useReadContract } from 'wagmi';
 import { isAddress } from 'viem';
 import { LaunchSubmitActions } from '@/components/launch-submit-actions';
-import { getChainConfig, withLangAndChain, type ChainKey } from '@/lib/chains';
+import { getChainConfig, type ChainKey } from '@/lib/chains';
 import { eagleErc20Abi } from '@/lib/contracts';
 import { t, type Lang } from '@/lib/i18n';
 
@@ -58,6 +57,33 @@ const copy = {
     quoteTokenPlaceholder: '输入 BSC 代币合约地址',
     quoteTokenDetected: '已识别配对币',
     quoteTokenInvalid: '请输入有效的 BSC BEP20 合约地址',
+    pageEyebrow: 'Launch dApp',
+    pageTitle: '用更清晰的双栏创建页，把代币发射前的样子先搭出来。',
+    pageSubtitle: '左边填写代币资料与发射参数，右边实时看到预上线卡片效果。',
+    required: '必填',
+    socialLinks: '社交链接',
+    poolMode: '池子模式',
+    singlePool: '单池',
+    multiPool: '多池',
+    pairAsset: '交易对资产',
+    networkHintLabel: '发射网络',
+    previewCardHint: '这里模拟的是代币上线前的预览卡片。',
+    previewStatus: '状态',
+    realtimePreview: '你在表单里输入的内容会实时同步到这里。',
+    dragAndDrop: '拖拽图片到这里，或点击上传',
+    dropHint: 'PNG, JPG, GIF, WebP · 5MB 上限',
+    creatorFeeWallet: '创作者费用接收地址',
+    firstBuyOptional: '首购金额',
+    firstBuyOptionalHint: '非必填，不填时会按 0 处理。',
+    reviewSummary: '创建前检查',
+    reviewSummaryHint: '提交前检查名称、交易对、网络和创作者设置是否正确。',
+    previewChain: '链网络',
+    previewPair: '交易对',
+    previewPoolMode: '池子结构',
+    tokenStoryLabel: 'Story',
+    livePreviewPanel: 'LIVE PREVIEW',
+    linksReady: '链接已填写',
+    noLinksYet: '暂未填写链接',
   },
   en: {
     native: 'Native',
@@ -98,6 +124,33 @@ const copy = {
     quoteTokenPlaceholder: 'Enter a BSC token contract address',
     quoteTokenDetected: 'Detected quote token',
     quoteTokenInvalid: 'Enter a valid BSC BEP20 contract address',
+    pageEyebrow: 'Launch dApp',
+    pageTitle: 'Shape the token page first, then launch it with confidence.',
+    pageSubtitle: 'Build everything on the left and watch the live pre-launch card update on the right.',
+    required: 'Required',
+    socialLinks: 'Social links',
+    poolMode: 'Pool mode',
+    singlePool: 'Single pool',
+    multiPool: 'Multi pool',
+    pairAsset: 'Pair asset',
+    networkHintLabel: 'Launch network',
+    previewCardHint: 'This is how your token card looks before it goes live.',
+    previewStatus: 'Status',
+    realtimePreview: 'Everything you enter in the form appears here in real time.',
+    dragAndDrop: 'Drag your artwork here or upload it',
+    dropHint: 'PNG, JPG, GIF, WebP · 5 MB max',
+    creatorFeeWallet: 'Creator fee recipient',
+    firstBuyOptional: 'First buy amount',
+    firstBuyOptionalHint: 'Optional. Leave it at 0 if you do not want an initial buy.',
+    reviewSummary: 'Before-you-launch summary',
+    reviewSummaryHint: 'Double-check the token name, pair, network, and creator settings before you submit.',
+    previewChain: 'Chain',
+    previewPair: 'Pair',
+    previewPoolMode: 'Pool layout',
+    tokenStoryLabel: 'Story',
+    livePreviewPanel: 'LIVE PREVIEW',
+    linksReady: 'Links ready',
+    noLinksYet: 'No links yet',
   },
   ja: {
     native: 'ネイティブ',
@@ -138,8 +191,80 @@ const copy = {
     quoteTokenPlaceholder: 'BSC トークンコントラクトアドレスを入力',
     quoteTokenDetected: '認識したペアトークン',
     quoteTokenInvalid: '有効な BSC BEP20 コントラクトアドレスを入力してください',
+    pageEyebrow: 'Launch dApp',
+    pageTitle: 'Create a token page that feels ready before it goes live.',
+    pageSubtitle: '左側で内容を整え、右側で公開前カードをリアルタイムに確認できます。',
+    required: '必須',
+    socialLinks: 'ソーシャルリンク',
+    poolMode: 'プールモード',
+    singlePool: '単一プール',
+    multiPool: '複数プール',
+    pairAsset: 'ペア資産',
+    networkHintLabel: 'ローンチ先ネットワーク',
+    previewCardHint: '公開前に表示されるカードの見え方です。',
+    previewStatus: 'ステータス',
+    realtimePreview: 'フォーム内容がここにそのまま反映されます。',
+    dragAndDrop: '画像をここへドラッグするか、アップロードしてください',
+    dropHint: 'PNG, JPG, GIF, WebP・最大 5MB',
+    creatorFeeWallet: 'クリエイター手数料受取先',
+    firstBuyOptional: '初回購入額',
+    firstBuyOptionalHint: '必要な場合のみ入力してください。空なら 0 のままです。',
+    reviewSummary: 'ローンチ前サマリー',
+    reviewSummaryHint: '送信前に名前、取引ペア、ネットワーク、クリエイター設定を確認してください。',
+    previewChain: 'チェーン',
+    previewPair: '取引ペア',
+    previewPoolMode: 'プール構成',
+    tokenStoryLabel: 'Story',
+    livePreviewPanel: 'LIVE PREVIEW',
+    linksReady: 'Links ready',
+    noLinksYet: 'No links yet',
   },
 } as const;
+
+const NAME_MAX = 32;
+const STORY_MAX = 1000;
+const URL_MAX = 120;
+const ADDRESS_MAX = 42;
+
+function SectionHeading({ step, title, description }: { step: string; title: string; description: string }) {
+  return (
+    <div className='mb-8 flex items-start gap-4 sm:gap-5'>
+      <div className='text-[2.2rem] font-semibold leading-none tracking-[-0.08em] text-[#f3f1e8] sm:text-[2.9rem]'>
+        {step}
+      </div>
+      <div className='pt-1'>
+        <h2 className='text-[1.35rem] font-semibold tracking-[-0.05em] text-[#f3f1e8] sm:text-[1.65rem]'>{title}</h2>
+        <p className='mt-2 max-w-2xl text-sm leading-7 text-[#8e9488]'>{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function FieldLabel({
+  label,
+  required,
+  count,
+  max,
+}: {
+  label: string;
+  required?: boolean;
+  count?: number;
+  max?: number;
+}) {
+  return (
+    <div className='mb-2.5 flex items-center justify-between gap-3'>
+      <label className='text-sm font-medium text-[#f3f1e8]'>
+        {label}
+        {required ? <span className='ml-1 text-[#f1e4b7]'>*</span> : null}
+      </label>
+      {typeof count === 'number' && typeof max === 'number' ? (
+        <span className='text-xs tabular-nums text-[#737a6d]'>
+          {count}/{max}
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainKey }) {
   const chain = getChainConfig(chainKey);
@@ -147,7 +272,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
   const [name, setName] = useState('');
   const [ticker, setTicker] = useState('');
   const [story, setStory] = useState('');
-  const [showSocialLinks, setShowSocialLinks] = useState(false);
+  const [poolMode, setPoolMode] = useState<'single' | 'multi'>('single');
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [twitterUrl, setTwitterUrl] = useState('');
   const [telegramUrl, setTelegramUrl] = useState('');
@@ -156,6 +281,7 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
   const [imageFileName, setImageFileName] = useState('');
   const [imageError, setImageError] = useState('');
   const [imageUploading, setImageUploading] = useState(false);
+  const [isDragActive, setIsDragActive] = useState(false);
   const [pair, setPair] = useState<(typeof pairOptions)[number]['key']>('BNB');
   const [feeTarget, setFeeTarget] = useState<'wallet' | 'holders'>('wallet');
   const [firstBuy, setFirstBuy] = useState('0.00');
@@ -164,7 +290,6 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
   const [totalSupply] = useState('1000000000');
   const [feeTier] = useState<100 | 500 | 2500 | 10000>(10000);
   const [initialBuyMinTokensOut] = useState('0');
-  const advancedOpen = false;
   const resolvedCustomQuoteToken = pair === 'ANY' && isAddress(quoteTokenInput) ? quoteTokenInput : undefined;
 
   const { data: customQuoteSymbol } = useReadContract({
@@ -203,6 +328,35 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
       subtitle: option.key === 'BNB' ? locale.native : option.key === 'USDT' ? locale.stable : option.subtitle,
     }));
   const chainMainnetLabel = `${chain.name} mainnet Chain ${chain.chainId}`;
+  const reviewRows = [
+    { label: t(lang, 'tokenName'), value: name || locale.tokenNamePlaceholder },
+    { label: t(lang, 'ticker'), value: `$${ticker || 'TICKER'}` },
+    { label: locale.previewPair, value: `${ticker || 'TICKER'} / ${pairLabel}` },
+    { label: locale.previewChain, value: chainMainnetLabel },
+    { label: locale.previewPoolMode, value: poolMode === 'single' ? locale.singlePool : locale.multiPool },
+    { label: locale.creatorFees, value: feeTargetLabel },
+  ];
+  const socialReadyText = [websiteUrl, twitterUrl, telegramUrl].filter(Boolean).length
+    ? [websiteUrl && locale.websiteLabel, twitterUrl && locale.xLabel, telegramUrl && locale.telegramLabel].filter(Boolean).join(' / ')
+    : locale.noLinksYet;
+
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragActive(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragActive(false);
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragActive(false);
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+    readImageFile(file);
+  }
 
   async function uploadImage(file: File) {
     const formData = new FormData();
@@ -232,11 +386,11 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
 
   function readImageFile(file: File) {
     if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type)) {
-      setImageError('仅支持 PNG、JPG、GIF、WebP');
+      setImageError(lang === 'zh' ? '仅支持 PNG、JPG、GIF、WebP' : lang === 'ja' ? 'PNG、JPG、GIF、WebP のみ対応です' : 'Only PNG, JPG, GIF, and WebP are supported');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      setImageError('图片不能超过 5 MB');
+      setImageError(lang === 'zh' ? '图片不能超过 5 MB' : lang === 'ja' ? '画像は 5 MB 以下にしてください' : 'Images must be 5 MB or smaller');
       return;
     }
 
@@ -267,464 +421,448 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
   }
 
   return (
-    <div className='grid gap-6 lg:grid-cols-[minmax(0,1fr)_390px]'>
-      <section className='min-w-0 space-y-5'>
-        <div className='max-w-3xl text-center lg:text-left'>
-          <p className='text-[11px] font-medium uppercase tracking-[0.24em] text-[#9da28f]'>{t(lang, 'madeForYourIdea')}</p>
-          <h1 className='mt-3.5 text-[2rem] font-semibold tracking-[-0.065em] text-[#f3f1e8] sm:text-[2.55rem]'>{t(lang, 'littleIdea')}</h1>
-          <h2 className='text-[1.7rem] font-semibold tracking-[-0.065em] text-[#f3f1e8] sm:text-[2.2rem]'>{t(lang, 'wholeNewToken')}</h2>
-          <p className='mt-2.5 text-[15px] leading-7 text-[#a8ad99]'>
-            {t(lang, 'makeItYoursLead')}
-          </p>
-          <Link
-            href={withLangAndChain('/docs#getting-started', lang, chainKey)}
-            className='mt-5 inline-flex h-10 items-center rounded-full border border-white/10 bg-white/[0.04] px-4 text-sm text-[#f1e4b7] transition hover:bg-white/[0.06]'
-          >
-            {t(lang, 'howItWorks')}
-          </Link>
+    <div className='space-y-8'>
+      <div className='space-y-6'>
+        <div className='max-w-4xl space-y-3'>
+          <p className='text-[11px] font-medium uppercase tracking-[0.22em] text-[#7f8779]'>{locale.pageEyebrow}</p>
+          <h1 className='max-w-4xl text-[2.2rem] font-semibold tracking-[-0.07em] text-[#f3f1e8] sm:text-[3rem]'>
+            {locale.pageTitle}
+          </h1>
+          <p className='max-w-3xl text-[15px] leading-8 text-[#8e9488]'>{locale.pageSubtitle}</p>
         </div>
 
-        <div className='flex flex-wrap items-center gap-2.5 text-sm'>
-          <a href='#story' className='rounded-full border border-[#e8d79f2f] bg-[#ffffff05] px-4 py-2.5 text-[#f1e4b7] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
-            <span className='mr-2 font-semibold'>01</span>
-            {t(lang, 'makeItYours')}
-          </a>
-          <a href='#pair' className='rounded-full border border-white/8 bg-[#131512] px-4 py-2.5 text-[#c5c9bc]'>
-            <span className='mr-2 font-semibold'>02</span>
-            {t(lang, 'setYourLaunch')}
-          </a>
-          <span className='px-1 py-2.5 text-[#8f9482]'>
-            <span className='mr-2 font-semibold'>03</span>
-            {t(lang, 'reviewAndCreate')}
-          </span>
-        </div>
-
-        <div id='story' className='rounded-[28px] border border-white/8 bg-[#1a1c19]/96 p-4 sm:p-5.5'>
-          <div className='mb-5 flex items-start justify-between gap-4'>
-            <div>
-              <h3 className='text-[1.65rem] font-semibold tracking-[-0.05em] text-[#f3f1e8]'>{t(lang, 'startWithStory')}</h3>
-              <p className='mt-2 text-sm leading-7 text-[#a8ad99]'>{t(lang, 'everyCommunityStarts')}</p>
-            </div>
-            <span className='text-sm text-[#8f9482]'>01</span>
-          </div>
-
-          <div className='space-y-5'>
-            <div>
-              <label className='mb-2 block text-sm font-medium text-[#f3f1e8]'>{t(lang, 'addTokenImage')}</label>
-              <div className='rounded-[22px] border border-dashed border-white/12 bg-[#131512] p-5'>
-                <div className='flex items-center gap-3'>
-                  {imagePreviewUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={imagePreviewUrl}
-                      alt='Token preview'
-                      className='h-12 w-12 rounded-full border border-white/10 object-cover'
-                    />
-                  ) : (
-                    <div className='flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[#d8c483]'>
-                      <ImagePlus className='h-5 w-5' />
-                    </div>
-                  )}
-                  <div>
-                    <p className='text-sm text-[#f3f1e8]'>{t(lang, 'dropItHere')}</p>
-                    <p className='mt-1 text-xs text-[#8f9482]'>{locale.imageFormats}</p>
-                  </div>
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type='file'
-                  accept='image/png,image/jpeg,image/gif,image/webp'
-                  onChange={handleImageChange}
-                  className='hidden'
-                />
-                <div className='mt-4 flex flex-wrap items-center gap-3'>
-                  <button
-                    type='button'
-                    onClick={() => fileInputRef.current?.click()}
-                    className='inline-flex h-10 items-center rounded-full border border-white/10 bg-white/[0.04] px-4 text-sm text-[#f1e4b7] transition hover:bg-white/[0.06]'
-                  >
-                    {t(lang, 'chooseFile')}
-                  </button>
-                  <span className='text-xs text-[#8f9482]'>{imageFileName || t(lang, 'noFileChosen')}</span>
-                  {imageUploading ? <span className='text-xs text-[#d8c483]'>上传中...</span> : null}
-                </div>
-                {imageError ? <p className='mt-3 text-xs text-[#f87171]'>{imageError}</p> : null}
-              </div>
-            </div>
-
-            <div className='grid gap-5 md:grid-cols-[minmax(0,1fr)_200px]'>
-              <div>
-                <label htmlFor='token-name' className='mb-2 block text-sm font-medium text-[#f3f1e8]'>
-                  {t(lang, 'tokenName')}
-                </label>
-                <input
-                  id='token-name'
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder={locale.tokenNamePlaceholder}
-                  className='h-12 w-full rounded-[18px] border border-white/8 bg-[#131512] px-4 text-sm text-[#f3f1e8] outline-none placeholder:text-[#6f7468]'
-                />
-              </div>
-              <div>
-                <label htmlFor='ticker' className='mb-2 block text-sm font-medium text-[#f3f1e8]'>
-                  {t(lang, 'ticker')}
-                </label>
-                <div className='flex h-12 items-center rounded-[18px] border border-white/8 bg-[#131512] px-4 text-sm text-[#f3f1e8]'>
-                  <span className='mr-2 text-[#8f9482]'>$</span>
-                  <input
-                    id='ticker'
-                    value={ticker}
-                    maxLength={12}
-                    onChange={(event) => setTicker(event.target.value.toUpperCase())}
-                    placeholder={locale.tickerPlaceholder}
-                    className='w-full bg-transparent outline-none placeholder:text-[#6f7468]'
-                  />
-                  <span className='text-xs text-[#8f9482]'>{ticker.length}/12</span>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor='story' className='mb-2 block text-sm font-medium text-[#f3f1e8]'>
-                {t(lang, 'yourStory')} <span className='text-[#8f9482]'>{t(lang, 'optional')}</span>
-              </label>
-              <textarea
-                id='story'
-                value={story}
-                maxLength={1000}
-                onChange={(event) => setStory(event.target.value)}
-                placeholder={locale.storyPlaceholder}
-                className='min-h-[128px] w-full rounded-[18px] border border-white/8 bg-[#131512] px-4 py-3 text-sm leading-7 text-[#f3f1e8] outline-none placeholder:text-[#6f7468]'
-              />
-              <p className='mt-2 text-right text-xs text-[#8f9482]'>{story.length} / 1,000</p>
-            </div>
-
-            <button
-              type='button'
-              onClick={() => setShowSocialLinks((current) => !current)}
-              className='inline-flex items-center gap-2 text-sm text-[#d8c483] transition hover:text-[#f1e4b7]'
+        <div className='grid gap-3 md:grid-cols-3'>
+          {[
+            ['01', t(lang, 'makeItYours')],
+            ['02', t(lang, 'setYourLaunch')],
+            ['03', t(lang, 'reviewAndCreate')],
+          ].map(([step, label], index) => (
+            <div
+              key={step}
+              className={`rounded-[24px] border px-5 py-4 ${
+                index === 0 ? 'border-[#f1e4b733] bg-[#191c19]' : 'border-white/8 bg-[#151815]'
+              }`}
             >
-              <Plus className='h-4 w-4' />
-              {t(lang, 'addWebsiteSocial')}
-              <span className='text-[#8f9482]'>{t(lang, 'optional')}</span>
-            </button>
-
-            {showSocialLinks ? (
-              <div className='grid gap-4 rounded-[18px] border border-white/8 bg-[#111310] p-4 md:grid-cols-3'>
-                <div>
-                  <label className='mb-2 block text-sm font-medium text-[#f3f1e8]'>{locale.websiteLabel}</label>
-                  <input
-                    value={websiteUrl}
-                    onChange={(event) => setWebsiteUrl(event.target.value)}
-                    placeholder={locale.websitePlaceholder}
-                    className='h-11 w-full rounded-[14px] border border-white/8 bg-[#171916] px-3 text-sm text-[#f3f1e8] outline-none placeholder:text-[#6f7468]'
-                  />
-                </div>
-                <div>
-                  <label className='mb-2 block text-sm font-medium text-[#f3f1e8]'>{locale.xLabel}</label>
-                  <input
-                    value={twitterUrl}
-                    onChange={(event) => setTwitterUrl(event.target.value)}
-                    placeholder={locale.xPlaceholder}
-                    className='h-11 w-full rounded-[14px] border border-white/8 bg-[#171916] px-3 text-sm text-[#f3f1e8] outline-none placeholder:text-[#6f7468]'
-                  />
-                </div>
-                <div>
-                  <label className='mb-2 block text-sm font-medium text-[#f3f1e8]'>{locale.telegramLabel}</label>
-                  <input
-                    value={telegramUrl}
-                    onChange={(event) => setTelegramUrl(event.target.value)}
-                    placeholder={locale.telegramPlaceholder}
-                    className='h-11 w-full rounded-[14px] border border-white/8 bg-[#171916] px-3 text-sm text-[#f3f1e8] outline-none placeholder:text-[#6f7468]'
-                  />
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div id='pair' className='rounded-[28px] border border-white/8 bg-[#1a1c19]/96 p-4 sm:p-5.5'>
-          <div className='mb-5 flex items-start justify-between gap-4'>
-            <div>
-              <h3 className='text-[1.65rem] font-semibold tracking-[-0.05em] text-[#f3f1e8]'>{t(lang, 'findPerfectPair')}</h3>
-              <p className='mt-2 text-sm leading-7 text-[#a8ad99]'>{t(lang, 'chooseWhatTrades')}</p>
+              <div className='text-[2rem] font-semibold tracking-[-0.08em] text-[#f3f1e8]'>{step}</div>
+              <div className='mt-3 text-sm font-medium text-[#c8cebf]'>{label}</div>
             </div>
-            <span className='text-sm text-[#8f9482]'>02</span>
-          </div>
+          ))}
+        </div>
+      </div>
 
-          <div className='flex flex-wrap gap-3'>
-            {localizedPairOptions.map((option) => {
-              const active = option.key === pair;
-              return (
-                <button
-                  key={option.key}
-                  type='button'
-                  onClick={() => setPair(option.key)}
-                  className={`rounded-full border px-4 py-2 text-sm transition ${
-                    active
-                      ? 'border-[#e8d79f2f] bg-[#ffffff05] text-[#f1e4b7]'
-                      : 'border-white/8 bg-[#131512] text-[#c5c9bc]'
+      <div className='grid gap-8 xl:grid-cols-[minmax(0,58fr)_minmax(340px,42fr)]'>
+        <section className='min-w-0 space-y-8'>
+          <div id='story' className='rounded-[30px] border border-white/8 bg-[#171a17] p-5 sm:p-7'>
+            <SectionHeading step='01' title={t(lang, 'startWithStory')} description={t(lang, 'everyCommunityStarts')} />
+
+            <div className='space-y-7'>
+              <div>
+                <FieldLabel label={t(lang, 'addTokenImage')} required />
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`rounded-[24px] border border-dashed p-5 transition sm:p-6 ${
+                    isDragActive ? 'border-[#f1e4b766] bg-[#1b201c]' : 'border-white/12 bg-[#111410]'
                   }`}
                 >
-                  {option.icon ? <span className='mr-2'>{option.icon}</span> : null}
-                  {option.label}
-                  {option.subtitle ? <span className='ml-2 text-[#8f9482]'>{option.subtitle}</span> : null}
-                </button>
-              );
-            })}
-          </div>
+                  <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+                    <div className='flex min-w-0 items-center gap-4'>
+                      {imagePreviewUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={imagePreviewUrl} alt='Token preview' className='h-16 w-16 rounded-[18px] border border-white/10 object-cover' />
+                      ) : (
+                        <div className='flex h-16 w-16 items-center justify-center rounded-[18px] border border-white/10 bg-[#171b17] text-[#f1e4b7]'>
+                          <ImagePlus className='h-6 w-6' />
+                        </div>
+                      )}
+                      <div className='min-w-0'>
+                        <p className='text-sm font-medium text-[#f3f1e8]'>{locale.dragAndDrop}</p>
+                        <p className='mt-1 text-xs text-[#737a6d]'>{locale.dropHint}</p>
+                        <p className='mt-2 truncate text-xs text-[#8e9488]'>{imageFileName || t(lang, 'noFileChosen')}</p>
+                      </div>
+                    </div>
 
-          <div className='mt-4 flex h-12 items-center gap-3 rounded-[18px] border border-white/8 bg-[#131512] px-4 text-sm text-[#8f9482]'>
-            <Search className='h-4 w-4' />
-            {pair === 'ANY' ? (
-              <input
-                value={quoteTokenInput}
-                onChange={(event) => setQuoteTokenInput(event.target.value)}
-                placeholder={locale.quoteTokenPlaceholder.replaceAll('BSC', chain.shortName)}
-                className='w-full bg-transparent text-sm text-[#f3f1e8] outline-none placeholder:text-[#6f7468]'
-              />
-            ) : (
-              <span>{pair === 'BNB' ? chain.wrappedNativeSymbol : chain.stableSymbol}</span>
-            )}
-          </div>
+                    <button
+                      type='button'
+                      onClick={() => fileInputRef.current?.click()}
+                      className='inline-flex h-11 w-full items-center justify-center gap-2 rounded-[16px] border border-white/10 bg-[#1c201c] px-4 text-sm text-[#f1e4b7] transition hover:bg-[#202520] sm:w-auto'
+                    >
+                      <Upload className='h-4 w-4' />
+                      {t(lang, 'chooseFile')}
+                    </button>
+                  </div>
 
-          {pair === 'ANY' ? (
-            <div className='mt-3 text-xs text-[#8f9482]'>
-              {resolvedCustomQuoteToken ? (
-                customQuoteSymbol || customQuoteName ? (
-                  <span>
-                    {locale.quoteTokenDetected}: <span className='text-[#f3f1e8]'>{customQuoteName ?? customQuoteSymbol}</span>
-                    {customQuoteSymbol ? <span className='text-[#d8c483]'> ({customQuoteSymbol})</span> : null}
-                  </span>
-                ) : (
-                  <span>{t(lang, 'search')}...</span>
-                )
-              ) : quoteTokenInput.trim() ? (
-                <span className='text-[#f87171]'>
-                  {locale.quoteTokenInvalid.replaceAll('BSC', chain.shortName).replace('BEP20', 'ERC20')}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-
-          <div className='mt-6 space-y-5 rounded-[22px] border border-white/8 bg-[#131512] p-5'>
-            <div className='flex items-center justify-between gap-4'>
-              <span className='text-sm text-[#8f9482]'>{locale.tradingPair}</span>
-              <span className='text-sm font-medium text-[#f3f1e8]'>${ticker || 'TICKER'} / {pairLabel}</span>
-            </div>
-            <div className='flex items-center justify-between gap-4'>
-              <span className='text-sm text-[#8f9482]'>{t(lang, 'launchingOn')}</span>
-              <span className='text-sm font-medium text-[#f3f1e8]'>{chainMainnetLabel}</span>
-            </div>
-            <div className='rounded-[18px] border border-white/8 bg-[#111310] p-4'>
-              <p className='text-sm font-medium text-[#f3f1e8]'>{t(lang, 'launchFeelsLikeYou')}</p>
-              <p className='mt-2 text-sm text-[#a8ad99]'>{t(lang, 'creatorFeesFirstBuyWallet')}</p>
-              <p className='mt-1 text-xs text-[#8f9482]'>{t(lang, 'optional')}</p>
-            </div>
-
-            <div className='grid gap-4 md:grid-cols-2'>
-              <div className='rounded-[18px] border border-white/8 bg-[#111310] p-4'>
-                <p className='text-sm text-[#8f9482]'>{locale.creatorFees}</p>
-                <div className='mt-3 flex gap-2'>
-                  <button
-                    type='button'
-                    onClick={() => setFeeTarget('wallet')}
-                    className={`rounded-full px-3 py-2 text-sm transition ${
-                      feeTarget === 'wallet'
-                        ? 'border border-[#e8d79f2f] bg-[#ffffff05] text-[#f1e4b7]'
-                        : 'border border-white/8 bg-[#171916] text-[#a8ad99]'
-                    }`}
-                  >
-                    {t(lang, 'feeWallet')}
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => setFeeTarget('holders')}
-                    className={`rounded-full px-3 py-2 text-sm transition ${
-                      feeTarget === 'holders'
-                        ? 'border border-[#e8d79f2f] bg-[#ffffff05] text-[#f1e4b7]'
-                        : 'border border-white/8 bg-[#171916] text-[#a8ad99]'
-                    }`}
-                  >
-                    {locale.holders}
-                  </button>
-                </div>
-                <p className='mt-3 text-xs leading-6 text-[#8f9482]'>{locale.feeTargetHint}</p>
-              </div>
-
-              <div className='rounded-[18px] border border-white/8 bg-[#111310] p-4'>
-                <p className='text-sm text-[#8f9482]'>{t(lang, 'firstPurchase')}</p>
-                <div className='mt-3 flex h-11 items-center rounded-[14px] border border-white/8 bg-[#171916] px-3 text-sm text-[#f3f1e8]'>
                   <input
-                    value={firstBuy}
-                    onChange={(event) => setFirstBuy(event.target.value)}
-                    className='w-full bg-transparent outline-none'
+                    ref={fileInputRef}
+                    type='file'
+                    accept='image/png,image/jpeg,image/gif,image/webp'
+                    onChange={handleImageChange}
+                    className='hidden'
                   />
-                  <span className='text-[#8f9482]'>{pairLabel}</span>
+                  {imageUploading ? <p className='mt-4 text-xs text-[#d8c483]'>{lang === 'zh' ? '图片上传中...' : lang === 'ja' ? '画像をアップロード中...' : 'Uploading image...'}</p> : null}
+                  {imageError ? <p className='mt-4 text-xs text-[#f87171]'>{imageError}</p> : null}
                 </div>
-                <p className='mt-3 text-xs leading-6 text-[#8f9482]'>{locale.firstPurchaseHint}</p>
               </div>
-            </div>
 
-            <div className='rounded-[18px] border border-white/8 bg-[#111310] p-4'>
-              <div className='flex items-center justify-between gap-4'>
-                <p className='text-sm text-[#8f9482]'>{t(lang, 'feeWallet')}</p>
-                <span className='text-xs text-[#8f9482]'>{t(lang, 'optional')}</span>
-              </div>
-              <input
-                value={feeWallet}
-                onChange={(event) => setFeeWallet(event.target.value)}
-                placeholder={locale.feeRecipientPlaceholder}
-                className='mt-3 h-11 w-full rounded-[14px] border border-white/8 bg-[#171916] px-3 text-sm text-[#f3f1e8] outline-none placeholder:text-[#6f7468]'
-              />
-            </div>
+              <div className='grid gap-5 lg:grid-cols-[minmax(0,1fr)_240px]'>
+                <div>
+                  <FieldLabel label={t(lang, 'tokenName')} required count={name.length} max={NAME_MAX} />
+                  <input
+                    id='token-name'
+                    value={name}
+                    maxLength={NAME_MAX}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder={locale.tokenNamePlaceholder}
+                    className='h-12 w-full rounded-[18px] border border-white/8 bg-[#111410] px-4 text-sm text-[#f3f1e8] outline-none placeholder:text-[#646b60]'
+                  />
+                </div>
 
-            {null}
-          </div>
-
-          <div className='mt-5 space-y-4'>
-            <div className='flex flex-wrap items-center gap-3'>
-              <span className='text-sm font-medium text-[#f3f1e8]'>{t(lang, 'reviewYourToken')}</span>
-              <span className='text-xs text-[#8f9482]'>{t(lang, 'saveDraft')}</span>
-            </div>
-            <div className='rounded-[18px] border border-white/8 bg-[#111310] p-4'>
-              <p className='text-sm text-[#a8ad99]'>
-                {t(lang, 'reviewYourToken')}
-              </p>
-              <div className='mt-3 grid gap-3 rounded-[14px] border border-white/8 bg-[#171916] p-3 text-sm'>
-                <div className='flex items-center justify-between gap-4'>
-                  <span className='text-[#8f9482]'>{locale.tradingPair}</span>
-                  <span className='text-[#f3f1e8]'>${ticker || 'TICKER'} / {pairLabel}</span>
-                </div>
-                <div className='flex items-center justify-between gap-4'>
-                  <span className='text-[#8f9482]'>{locale.creatorFees}</span>
-                  <span className='text-[#f3f1e8]'>{feeTargetLabel}</span>
-                </div>
-                <div className='flex items-center justify-between gap-4'>
-                  <span className='text-[#8f9482]'>{t(lang, 'firstPurchase')}</span>
-                  <span className='text-[#f3f1e8]'>{firstBuy || '0.00'} {pairLabel}</span>
-                </div>
-                {websiteUrl || twitterUrl || telegramUrl ? (
-                  <div className='flex items-center justify-between gap-4'>
-                    <span className='text-[#8f9482]'>{t(lang, 'addWebsiteSocial')}</span>
-                    <span className='text-[#f3f1e8]'>
-                      {[websiteUrl && locale.websiteLabel, twitterUrl && locale.xLabel, telegramUrl && locale.telegramLabel]
-                        .filter(Boolean)
-                        .join(' / ')}
-                    </span>
+                <div>
+                  <FieldLabel label={t(lang, 'ticker')} required count={ticker.length} max={12} />
+                  <div className='flex h-12 items-center rounded-[18px] border border-white/8 bg-[#111410] px-4 text-sm text-[#f3f1e8]'>
+                    <span className='mr-2 text-[#737a6d]'>$</span>
+                    <input
+                      id='ticker'
+                      value={ticker}
+                      maxLength={12}
+                      onChange={(event) => setTicker(event.target.value.toUpperCase())}
+                      placeholder={locale.tickerPlaceholder}
+                      className='w-full bg-transparent outline-none placeholder:text-[#646b60]'
+                    />
                   </div>
-                ) : null}
-                {advancedOpen ? (
-                  <div className='flex items-center justify-between gap-4'>
-                    <span className='text-[#8f9482]'>{locale.advancedSettings}</span>
-                    <span className='text-[#f3f1e8]'>{locale.advancedSummary}</span>
+                </div>
+              </div>
+
+              <div>
+                <FieldLabel label={locale.tokenStoryLabel} count={story.length} max={STORY_MAX} />
+                <textarea
+                  id='story'
+                  value={story}
+                  maxLength={STORY_MAX}
+                  onChange={(event) => setStory(event.target.value)}
+                  placeholder={locale.storyPlaceholder}
+                  className='min-h-[160px] w-full rounded-[20px] border border-white/8 bg-[#111410] px-4 py-3.5 text-sm leading-7 text-[#f3f1e8] outline-none placeholder:text-[#646b60]'
+                />
+              </div>
+
+              <div className='rounded-[24px] border border-white/8 bg-[#111410] p-4 sm:p-5'>
+                <div className='mb-5 flex items-center gap-2 text-sm font-medium text-[#f3f1e8]'>
+                  <Link2 className='h-4 w-4 text-[#f1e4b7]' />
+                  {locale.socialLinks}
+                </div>
+                <div className='grid gap-4 lg:grid-cols-3'>
+                  <div>
+                    <FieldLabel label={locale.websiteLabel} count={websiteUrl.length} max={URL_MAX} />
+                    <div className='relative'>
+                      <Globe className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6f766a]' />
+                      <input
+                        value={websiteUrl}
+                        maxLength={URL_MAX}
+                        onChange={(event) => setWebsiteUrl(event.target.value)}
+                        placeholder={locale.websitePlaceholder}
+                        className='h-12 w-full rounded-[16px] border border-white/8 bg-[#171b17] pl-10 pr-3 text-sm text-[#f3f1e8] outline-none placeholder:text-[#646b60]'
+                      />
+                    </div>
                   </div>
-                ) : null}
+                  <div>
+                    <FieldLabel label={locale.xLabel} count={twitterUrl.length} max={URL_MAX} />
+                    <div className='relative'>
+                      <span className='pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#6f766a]'>X</span>
+                      <input
+                        value={twitterUrl}
+                        maxLength={URL_MAX}
+                        onChange={(event) => setTwitterUrl(event.target.value)}
+                        placeholder={locale.xPlaceholder}
+                        className='h-12 w-full rounded-[16px] border border-white/8 bg-[#171b17] pl-10 pr-3 text-sm text-[#f3f1e8] outline-none placeholder:text-[#646b60]'
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <FieldLabel label={locale.telegramLabel} count={telegramUrl.length} max={URL_MAX} />
+                    <div className='relative'>
+                      <MessageCircle className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6f766a]' />
+                      <input
+                        value={telegramUrl}
+                        maxLength={URL_MAX}
+                        onChange={(event) => setTelegramUrl(event.target.value)}
+                        placeholder={locale.telegramPlaceholder}
+                        className='h-12 w-full rounded-[16px] border border-white/8 bg-[#171b17] pl-10 pr-3 text-sm text-[#f3f1e8] outline-none placeholder:text-[#646b60]'
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
-              <p className='mt-3 text-sm leading-7 text-[#8f9482]'>
-                Launches are live on {chain.name}. Review your token to launch it from your wallet.
-              </p>
             </div>
-            <LaunchSubmitActions
-              lang={lang}
-              chainKey={chainKey}
-              name={name}
-              ticker={ticker}
-              story={story}
-              websiteUrl={websiteUrl}
-              twitterUrl={twitterUrl}
-              telegramUrl={telegramUrl}
-              imageUrl={imageUrl}
-              imageUploading={imageUploading}
-              pair={pair}
-              feeTarget={feeTarget}
-              firstBuy={firstBuy}
-              feeWallet={feeWallet}
-              quoteTokenInput={quoteTokenInput}
-              totalSupply={totalSupply}
-              feeTier={feeTier}
-              initialBuyMinTokensOut={initialBuyMinTokensOut}
-            />
-          </div>
-        </div>
-      </section>
-
-      <aside className='min-w-0 lg:sticky lg:top-20 lg:self-start'>
-        <div className='rounded-[28px] border border-white/8 bg-[#1a1c19]/96 p-4 shadow-[0_8px_30px_rgba(0,0,0,0.22)] sm:p-5'>
-          <div className='mb-5 flex items-center justify-between'>
-            <div>
-              <p className='text-xs font-medium uppercase tracking-[0.18em] text-[#8f9482]'>{t(lang, 'livePreview')}</p>
-              <p className='mt-1 text-sm text-[#a8ad99]'>{t(lang, 'yourIdeaComingToLife')}</p>
-            </div>
-            <span className='rounded-full border border-white/8 bg-[#131512] px-3 py-1 text-xs text-[#d8c483]'>◆ {chain.name.toUpperCase()}</span>
           </div>
 
-          <div className='rounded-[24px] border border-white/8 bg-[#131512] p-5'>
-            <p className='text-[11px] font-medium uppercase tracking-[0.18em] text-[#8f9482]'>{t(lang, 'yourNextBigThing')}</p>
-            <h3 className='mt-3.5 text-[1.6rem] font-semibold tracking-[-0.05em] text-[#f3f1e8]'>
-              {name || locale.yourTokenName}
-            </h3>
-            <p className='mt-1 text-[14px] text-[#c7cbbe]'>
-              ${ticker || 'TICKER'} Paired with <span className='font-semibold text-[#f3f1e8]'>{pairLabel}</span>
-            </p>
-            <p className='mt-3.5 text-[14px] leading-7 text-[#a8ad99]'>
-              {story || locale.previewStory}
-            </p>
+          <div id='pair' className='rounded-[30px] border border-white/8 bg-[#171a17] p-5 sm:p-7'>
+            <SectionHeading step='02' title={t(lang, 'findPerfectPair')} description={t(lang, 'chooseWhatTrades')} />
 
-            {websiteUrl || twitterUrl || telegramUrl ? (
-              <div className='mt-4 flex flex-wrap gap-2 text-xs text-[#d8c483]'>
-                {websiteUrl ? <span className='rounded-full border border-white/8 bg-[#10120f] px-3 py-1'>{locale.websiteLabel}</span> : null}
-                {twitterUrl ? <span className='rounded-full border border-white/8 bg-[#10120f] px-3 py-1'>{locale.xLabel}</span> : null}
-                {telegramUrl ? <span className='rounded-full border border-white/8 bg-[#10120f] px-3 py-1'>{locale.telegramLabel}</span> : null}
-              </div>
-            ) : null}
+            <div className='space-y-7'>
+              <div className='grid gap-5 lg:grid-cols-2'>
+                <div>
+                  <FieldLabel label={locale.poolMode} required />
+                  <div className='grid gap-3 sm:grid-cols-2'>
+                    {[
+                      ['single', locale.singlePool],
+                      ['multi', locale.multiPool],
+                    ].map(([value, label]) => {
+                      const active = poolMode === value;
+                      return (
+                        <button
+                          key={value}
+                          type='button'
+                          onClick={() => setPoolMode(value as 'single' | 'multi')}
+                          className={`rounded-[18px] border px-4 py-4 text-left transition ${
+                            active ? 'border-[#f1e4b744] bg-[#1d211d] text-[#f3f1e8]' : 'border-white/8 bg-[#111410] text-[#a2a89d]'
+                          }`}
+                        >
+                          <div className='text-sm font-medium'>{label}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-            <div className='mt-4 grid gap-3 rounded-[18px] border border-white/8 bg-[#10120f] p-4'>
-              <div className='flex items-center justify-between text-[14px]'>
-                <span className='text-[#8f9482]'>{t(lang, 'network')}</span>
-                <span className='text-[#f3f1e8]'>{chain.name}</span>
+                <div>
+                  <FieldLabel label={locale.pairAsset} required />
+                  <div className='relative'>
+                    <select
+                      value={pair}
+                      onChange={(event) => setPair(event.target.value as (typeof pairOptions)[number]['key'])}
+                      className='h-12 w-full appearance-none rounded-[18px] border border-white/8 bg-[#111410] px-4 pr-10 text-sm text-[#f3f1e8] outline-none'
+                    >
+                      {localizedPairOptions.map((option) => (
+                        <option key={option.key} value={option.key}>
+                          {option.label}{option.subtitle ? ` · ${option.subtitle}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className='pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6f766a]' />
+                  </div>
+                </div>
               </div>
-              <div className='flex items-center justify-between text-[14px]'>
-                <span className='text-[#8f9482]'>{t(lang, 'status')}</span>
-                <span className='text-[#f3f1e8]'>{t(lang, 'preLaunch')}</span>
-              </div>
-              <div className='flex items-center justify-between text-[14px]'>
-                <span className='text-[#8f9482]'>{t(lang, 'fees')}</span>
-                <span className='text-[#f3f1e8]'>{feeTargetLabel}</span>
-              </div>
-              {advancedOpen ? (
-                <div className='flex items-center justify-between text-[14px]'>
-                  <span className='text-[#8f9482]'>{locale.advancedSettings}</span>
-                  <span className='text-[#f3f1e8]'>{locale.advancedSummary}</span>
+
+              {pair === 'ANY' ? (
+                <div>
+                  <FieldLabel label={locale.quoteTokenPlaceholder.replaceAll('BSC', chain.shortName)} count={quoteTokenInput.length} max={ADDRESS_MAX} />
+                  <input
+                    value={quoteTokenInput}
+                    maxLength={ADDRESS_MAX}
+                    onChange={(event) => setQuoteTokenInput(event.target.value)}
+                    placeholder={locale.quoteTokenPlaceholder.replaceAll('BSC', chain.shortName)}
+                    className='h-12 w-full rounded-[18px] border border-white/8 bg-[#111410] px-4 text-sm text-[#f3f1e8] outline-none placeholder:text-[#646b60]'
+                  />
+                  <div className='mt-3 text-xs text-[#8f9482]'>
+                    {resolvedCustomQuoteToken ? (
+                      customQuoteSymbol || customQuoteName ? (
+                        <span>
+                          {locale.quoteTokenDetected}: <span className='text-[#f3f1e8]'>{customQuoteName ?? customQuoteSymbol}</span>
+                          {customQuoteSymbol ? <span className='text-[#d8c483]'> ({customQuoteSymbol})</span> : null}
+                        </span>
+                      ) : (
+                        <span>{t(lang, 'search')}...</span>
+                      )
+                    ) : quoteTokenInput.trim() ? (
+                      <span className='text-[#f87171]'>
+                        {locale.quoteTokenInvalid.replaceAll('BSC', chain.shortName).replace('BEP20', 'ERC20')}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
-            </div>
 
-            <p className='mt-4 text-[13px] text-[#8f9482]'>{t(lang, 'firstLook')}</p>
+              <div className='rounded-[24px] border border-white/8 bg-[#111410] p-5'>
+                <div className='grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]'>
+                  <div className='space-y-5'>
+                    <div>
+                      <FieldLabel label={locale.networkHintLabel} required />
+                      <div className='rounded-[18px] border border-white/8 bg-[#171b17] px-4 py-3 text-sm text-[#f3f1e8]'>
+                        {chainMainnetLabel}
+                      </div>
+                    </div>
+
+                    <div>
+                      <FieldLabel label={locale.creatorFees} />
+                      <div className='grid gap-3 sm:grid-cols-2'>
+                        <button
+                          type='button'
+                          onClick={() => setFeeTarget('wallet')}
+                          className={`rounded-[18px] border px-4 py-4 text-left transition ${
+                            feeTarget === 'wallet' ? 'border-[#f1e4b744] bg-[#1d211d] text-[#f3f1e8]' : 'border-white/8 bg-[#171b17] text-[#a2a89d]'
+                          }`}
+                        >
+                          <div className='text-sm font-medium'>{t(lang, 'feeWallet')}</div>
+                          <div className='mt-1 text-xs text-[#767d71]'>{locale.feeTargetHint}</div>
+                        </button>
+                        <button
+                          type='button'
+                          onClick={() => setFeeTarget('holders')}
+                          className={`rounded-[18px] border px-4 py-4 text-left transition ${
+                            feeTarget === 'holders' ? 'border-[#f1e4b744] bg-[#1d211d] text-[#f3f1e8]' : 'border-white/8 bg-[#171b17] text-[#a2a89d]'
+                          }`}
+                        >
+                          <div className='text-sm font-medium'>{locale.holders}</div>
+                          <div className='mt-1 text-xs text-[#767d71]'>{locale.feeTargetHint}</div>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className='space-y-5'>
+                    <div>
+                      <FieldLabel label={locale.creatorFeeWallet} count={feeWallet.length} max={ADDRESS_MAX} />
+                      <input
+                        value={feeWallet}
+                        maxLength={ADDRESS_MAX}
+                        onChange={(event) => setFeeWallet(event.target.value)}
+                        placeholder={locale.feeRecipientPlaceholder}
+                        className='h-12 w-full rounded-[18px] border border-white/8 bg-[#171b17] px-4 text-sm text-[#f3f1e8] outline-none placeholder:text-[#646b60]'
+                      />
+                    </div>
+
+                    <div>
+                      <FieldLabel label={locale.firstBuyOptional} />
+                      <div className='flex h-12 w-full items-center rounded-[18px] border border-white/8 bg-[#171b17] px-4 text-sm text-[#f3f1e8]'>
+                        <input
+                          value={firstBuy}
+                          onChange={(event) => setFirstBuy(event.target.value)}
+                          className='w-full bg-transparent outline-none'
+                        />
+                        <span className='ml-3 text-[#6f766a]'>{pairLabel}</span>
+                      </div>
+                      <p className='mt-2 text-xs text-[#737a6d]'>{locale.firstBuyOptionalHint}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className='mt-5 rounded-[24px] border border-white/8 bg-[#131512] p-5'>
-            <h4 className='text-[1.25rem] font-semibold tracking-[-0.04em] text-[#f3f1e8]'>{t(lang, 'bigCommunitiesStartSmall')}</h4>
-            <p className='mt-3 text-sm leading-7 text-[#a8ad99]'>
-              {t(lang, 'bringIdea')}
-            </p>
-            <p className='text-sm leading-7 text-[#a8ad99]'>{t(lang, 'makeSomething')}</p>
+          <div className='rounded-[30px] border border-white/8 bg-[#171a17] p-5 sm:p-7'>
+            <SectionHeading step='03' title={t(lang, 'reviewAndCreate')} description={locale.reviewSummaryHint} />
 
-            <div className='mt-5 flex flex-wrap gap-2 text-sm'>
-              <a href={chain.docsWebsite} className='inline-flex h-10 items-center gap-1 rounded-full border border-white/10 px-3 py-2 text-[#d8c483] transition hover:bg-white/[0.04]'>
-                <Triangle className='h-3.5 w-3.5 fill-current stroke-none' />
-              </a>
-              <a href={chain.docsWebsite} className='inline-flex h-10 items-center gap-1 rounded-full border border-white/10 px-3 py-2 text-[#d8c483] transition hover:bg-white/[0.04]'>
-                <Globe className='h-3.5 w-3.5' />
-                {locale.builtForCreators}
-              </a>
-              <a href={chain.docsWebsite} className='inline-flex h-10 items-center gap-1 rounded-full border border-white/10 px-3 py-2 text-[#d8c483] transition hover:bg-white/[0.04]'>
-                Powered by {chain.name}.
-              </a>
+            <div className='space-y-6'>
+              <div className='rounded-[24px] border border-white/8 bg-[#111410] p-5'>
+                <div className='mb-4 text-sm font-medium text-[#f3f1e8]'>{locale.reviewSummary}</div>
+                <div className='grid gap-3 rounded-[20px] border border-white/8 bg-[#171b17] p-4 text-sm'>
+                  {reviewRows.map((row) => (
+                    <div key={row.label} className='flex items-center justify-between gap-4'>
+                      <span className='text-[#737a6d]'>{row.label}</span>
+                      <span className='max-w-[65%] text-right text-[#f3f1e8]'>{row.value}</span>
+                    </div>
+                  ))}
+                  <div className='flex items-center justify-between gap-4'>
+                    <span className='text-[#737a6d]'>{t(lang, 'firstPurchase')}</span>
+                    <span className='text-[#f3f1e8]'>{firstBuy || '0.00'} {pairLabel}</span>
+                  </div>
+                  <div className='flex items-center justify-between gap-4'>
+                    <span className='text-[#737a6d]'>{locale.socialLinks}</span>
+                    <span className='max-w-[65%] text-right text-[#f3f1e8]'>{socialReadyText}</span>
+                  </div>
+                </div>
+                <p className='mt-4 text-sm leading-7 text-[#8e9488]'>
+                  {locale.reviewSummaryHint}
+                </p>
+              </div>
+
+              <LaunchSubmitActions
+                lang={lang}
+                chainKey={chainKey}
+                name={name}
+                ticker={ticker}
+                story={story}
+                websiteUrl={websiteUrl}
+                twitterUrl={twitterUrl}
+                telegramUrl={telegramUrl}
+                imageUrl={imageUrl}
+                imageUploading={imageUploading}
+                pair={pair}
+                feeTarget={feeTarget}
+                firstBuy={firstBuy}
+                feeWallet={feeWallet}
+                quoteTokenInput={quoteTokenInput}
+                totalSupply={totalSupply}
+                feeTier={feeTier}
+                initialBuyMinTokensOut={initialBuyMinTokensOut}
+              />
             </div>
           </div>
-        </div>
-      </aside>
+        </section>
+
+        <aside className='min-w-0 xl:sticky xl:top-24 xl:self-start'>
+          <div className='rounded-[30px] border border-white/8 bg-[#171a17] p-5 shadow-[0_12px_36px_rgba(0,0,0,0.22)] sm:p-6'>
+            <div className='mb-5 flex items-start justify-between gap-4'>
+              <div>
+                <p className='text-xs font-medium uppercase tracking-[0.18em] text-[#7f8779]'>{locale.livePreviewPanel}</p>
+                <p className='mt-2 text-sm leading-7 text-[#8e9488]'>{locale.realtimePreview}</p>
+              </div>
+              <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1 text-xs text-[#f1e4b7]'>
+                {t(lang, 'preLaunch')}
+              </span>
+            </div>
+
+            <div className='rounded-[26px] border border-white/8 bg-[#10130f] p-5 sm:p-6'>
+              <div className='rounded-[24px] border border-white/8 bg-[radial-gradient(circle_at_bottom,rgba(101,92,255,0.24),rgba(16,19,15,0)_45%),#131712] p-5'>
+                <div className='flex items-start gap-4'>
+                  {imagePreviewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={imagePreviewUrl} alt='Token preview' className='h-20 w-20 rounded-[22px] border border-white/10 object-cover' />
+                  ) : (
+                    <div className='flex h-20 w-20 items-center justify-center rounded-[22px] border border-white/10 bg-[#191d19] text-[#f1e4b7]'>
+                      <ImagePlus className='h-7 w-7' />
+                    </div>
+                  )}
+                  <div className='min-w-0 flex-1'>
+                    <div className='text-xs uppercase tracking-[0.18em] text-[#737a6d]'>{locale.previewCardHint}</div>
+                    <h3 className='mt-3 truncate text-[1.6rem] font-semibold tracking-[-0.06em] text-[#f3f1e8]'>
+                      {name || locale.yourTokenName}
+                    </h3>
+                    <div className='mt-2 flex flex-wrap items-center gap-2 text-sm text-[#c2c8bd]'>
+                      <span>${ticker || 'TICKER'}</span>
+                      <span className='text-[#5f665b]'>/</span>
+                      <span>{pairLabel}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <p className='mt-5 min-h-[84px] text-sm leading-7 text-[#8e9488]'>
+                  {story || locale.previewStory}
+                </p>
+
+                <div className='mt-5 grid gap-3 rounded-[20px] border border-white/8 bg-[#0d0f0d] p-4 text-sm'>
+                  <div className='flex items-center justify-between gap-4'>
+                    <span className='text-[#737a6d]'>{locale.previewPair}</span>
+                    <span className='text-[#f3f1e8]'>${ticker || 'TICKER'} / {pairLabel}</span>
+                  </div>
+                  <div className='flex items-center justify-between gap-4'>
+                    <span className='text-[#737a6d]'>{locale.previewChain}</span>
+                    <span className='text-[#f3f1e8]'>{chain.name}</span>
+                  </div>
+                  <div className='flex items-center justify-between gap-4'>
+                    <span className='text-[#737a6d]'>{locale.previewStatus}</span>
+                    <span className='text-[#f3f1e8]'>{t(lang, 'preLaunch')}</span>
+                  </div>
+                  <div className='flex items-center justify-between gap-4'>
+                    <span className='text-[#737a6d]'>{locale.previewPoolMode}</span>
+                    <span className='text-[#f3f1e8]'>{poolMode === 'single' ? locale.singlePool : locale.multiPool}</span>
+                  </div>
+                </div>
+
+                <div className='mt-5 flex flex-wrap gap-2 text-xs'>
+                  {websiteUrl ? <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#f1e4b7]'>{locale.websiteLabel}</span> : null}
+                  {twitterUrl ? <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#f1e4b7]'>{locale.xLabel}</span> : null}
+                  {telegramUrl ? <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#f1e4b7]'>{locale.telegramLabel}</span> : null}
+                  {!websiteUrl && !twitterUrl && !telegramUrl ? (
+                    <span className='rounded-full border border-white/8 bg-[#111410] px-3 py-1.5 text-[#737a6d]'>{locale.noLinksYet}</span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }
