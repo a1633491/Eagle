@@ -900,10 +900,10 @@ export function LaunchSubmitActions({
         <p className='text-xs text-[#8f9482]'>{locale.metadataCompacted}</p>
       ) : null}
       {status ? <p className='text-sm text-[#d8c483]'>{status}</p> : null}
-      <div className='flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center'>
+      <div className='flex flex-col-reverse gap-3 sm:flex-row sm:items-center'>
         <button
           type='button'
-          className='inline-flex h-11 w-full items-center justify-center rounded-full border border-white/10 bg-transparent px-5 text-sm font-medium text-[#c5c9bc] transition hover:bg-white/[0.04] sm:w-auto'
+          className='inline-flex h-14 w-full items-center justify-center rounded-[18px] border border-white/10 bg-[#1a1b18] px-5 text-sm font-medium text-[#e4e1d5] transition hover:bg-[#1f201d] sm:w-[180px]'
         >
           {locale.saveDraft}
         </button>
@@ -911,7 +911,7 @@ export function LaunchSubmitActions({
           type='button'
           onClick={primaryAction}
           disabled={!(approvalSatisfied ? canLaunch : canApprove) || isBusy}
-          className='inline-flex h-11 w-full items-center justify-center rounded-full border border-[#f6e3ac66] bg-[linear-gradient(145deg,#f7e8ba,#d1b773)] px-5 text-sm font-medium text-[#342d1a] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto'
+          className='inline-flex h-14 w-full items-center justify-center rounded-[18px] border border-[#f6e3ac66] bg-[linear-gradient(145deg,#efe1b2,#d6c38a)] px-5 text-base font-medium text-[#342d1a] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-1'
         >
           {isBusy ? '...' : primaryLabel}
         </button>
