@@ -295,15 +295,6 @@ function FieldLabel({
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className='flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
-      <span className='text-[#8b9186]'>{label}</span>
-      <span className='w-full text-left text-[#f3f1e8] sm:w-auto sm:max-w-[65%] sm:text-right'>{value}</span>
-    </div>
-  );
-}
-
 export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainKey }) {
   const chain = getChainConfig(chainKey);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -357,7 +348,6 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
   }, [chain.nativeSymbol, chain.stableSymbol, customQuoteSymbol, pair]);
 
   const locale = copy[lang];
-  const feeTargetLabel = feeTarget === 'wallet' ? t(lang, 'feeWallet') : locale.holders;
   const localizedPairOptions = pairOptions
     .filter((option) => !(option.key === 'USDT' && chain.stableToken.toLowerCase() === chain.wrappedNativeToken.toLowerCase()))
     .map((option) => ({
@@ -365,19 +355,6 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
       label: option.key === 'ANY' ? chain.anyTokenLabel : option.key === 'BNB' ? chain.nativeSymbol : chain.stableSymbol,
       subtitle: option.key === 'BNB' ? locale.native : option.key === 'USDT' ? locale.stable : option.subtitle,
     }));
-  const chainMainnetLabel = `${chain.name} mainnet Chain ${chain.chainId}`;
-  const reviewRows = [
-    { label: t(lang, 'tokenName'), value: name || locale.tokenNamePlaceholder },
-    { label: t(lang, 'ticker'), value: `$${ticker || 'TICKER'}` },
-    { label: locale.previewPair, value: `${ticker || 'TICKER'} / ${pairLabel}` },
-    { label: locale.previewChain, value: chainMainnetLabel },
-    { label: locale.previewPoolMode, value: poolMode === 'single' ? locale.singlePool : locale.multiPool },
-    { label: locale.creatorFees, value: feeTargetLabel },
-  ];
-  const socialReadyText = [websiteUrl, twitterUrl, telegramUrl].filter(Boolean).length
-    ? [websiteUrl && locale.websiteLabel, twitterUrl && locale.xLabel, telegramUrl && locale.telegramLabel].filter(Boolean).join(' / ')
-    : locale.noLinksYet;
-
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setIsDragActive(true);
@@ -816,45 +793,26 @@ export function LaunchBuilder({ lang, chainKey }: { lang: Lang; chainKey: ChainK
             </div>
           </section>
 
-          <section className='rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(36,37,34,0.96),rgba(26,27,25,0.96))] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[34px] sm:p-8'>
-            <BrewSectionHeading
-              step='04'
-              title={t(lang, 'reviewAndCreate')}
-              description={locale.reviewSummaryHint}
-              icon={<Sparkles className='h-7 w-7' />}
-            />
-
-            <div className='grid gap-3 rounded-[20px] border border-white/8 bg-[#151613] p-4 text-sm'>
-              {reviewRows.map((row) => (
-                <InfoRow label={row.label} value={row.value} key={row.label} />
-              ))}
-              <InfoRow label={t(lang, 'firstPurchase')} value={`${firstBuy || '0.00'} ${pairLabel}`} />
-              <InfoRow label={locale.socialLinks} value={socialReadyText} />
-            </div>
-
-            <div className='mt-6'>
-              <LaunchSubmitActions
-                lang={lang}
-                chainKey={chainKey}
-                name={name}
-                ticker={ticker}
-                story={story}
-                websiteUrl={websiteUrl}
-                twitterUrl={twitterUrl}
-                telegramUrl={telegramUrl}
-                imageUrl={imageUrl}
-                imageUploading={imageUploading}
-                pair={pair}
-                feeTarget={feeTarget}
-                firstBuy={firstBuy}
-                feeWallet={feeWallet}
-                quoteTokenInput={quoteTokenInput}
-                totalSupply={totalSupply}
-                feeTier={feeTier}
-                initialBuyMinTokensOut={initialBuyMinTokensOut}
-              />
-            </div>
-          </section>
+          <LaunchSubmitActions
+            lang={lang}
+            chainKey={chainKey}
+            name={name}
+            ticker={ticker}
+            story={story}
+            websiteUrl={websiteUrl}
+            twitterUrl={twitterUrl}
+            telegramUrl={telegramUrl}
+            imageUrl={imageUrl}
+            imageUploading={imageUploading}
+            pair={pair}
+            feeTarget={feeTarget}
+            firstBuy={firstBuy}
+            feeWallet={feeWallet}
+            quoteTokenInput={quoteTokenInput}
+            totalSupply={totalSupply}
+            feeTier={feeTier}
+            initialBuyMinTokensOut={initialBuyMinTokensOut}
+          />
       </div>
     </div>
   );
