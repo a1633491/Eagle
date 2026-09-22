@@ -24,7 +24,8 @@ const copy = {
     notLaunched: '当前代币不在 EagleFactory 发射记录里',
     quoteToken: '配对代币',
     creator: '创建者',
-    claimable: '我的可领取费用',
+    claimableQuote: '我的可领取配对币费用',
+    claimableToken: '我的可领取代币费用',
     distributor: '持有人分发合约',
     predictedDistributor: '预计分发地址',
     collectFees: '收集全部费用',
@@ -47,7 +48,8 @@ const copy = {
     notLaunched: 'This token is not registered in EagleFactory',
     quoteToken: 'Quote token',
     creator: 'Creator',
-    claimable: 'My claimable fees',
+    claimableQuote: 'My claimable quote fees',
+    claimableToken: 'My claimable token fees',
     distributor: 'Holder distributor',
     predictedDistributor: 'Predicted distributor',
     collectFees: 'Collect all fees',
@@ -70,7 +72,8 @@ const copy = {
     notLaunched: 'このトークンは EagleFactory に登録されていません',
     quoteToken: 'ペアトークン',
     creator: '作成者',
-    claimable: '自分の請求可能手数料',
+    claimableQuote: '自分の請求可能なペア手数料',
+    claimableToken: '自分の請求可能なトークン手数料',
     distributor: '保有者分配コントラクト',
     predictedDistributor: '予定分配アドレス',
     collectFees: '全手数料を回収',
@@ -171,7 +174,27 @@ export function TokenChainActions({
     },
   });
 
-  const { data: claimableFees } = useReadContract({
+  const { data: tokenDecimals } = useReadContract({
+    chainId: eagleContracts.chainId,
+    address: normalizedToken,
+    abi: eagleErc20Abi,
+    functionName: 'decimals',
+    query: {
+      enabled: Boolean(normalizedToken),
+    },
+  });
+
+  const { data: tokenSymbol } = useReadContract({
+    chainId: eagleContracts.chainId,
+    address: normalizedToken,
+    abi: eagleErc20Abi,
+    functionName: 'symbol',
+    query: {
+      enabled: Boolean(normalizedToken),
+    },
+  });
+
+  const { data: claimableQuoteFees } = useReadContract({
     chainId: eagleContracts.chainId,
     address: eagleContracts.locker,
     abi: eagleLiquidityLockerAbi,
@@ -182,10 +205,26 @@ export function TokenChainActions({
     },
   });
 
-  const claimableText = useMemo(() => {
+  const { data: claimableTokenFees } = useReadContract({
+    chainId: eagleContracts.chainId,
+    address: eagleContracts.locker,
+    abi: eagleLiquidityLockerAbi,
+    functionName: 'claimableFees',
+    args: address && normalizedToken ? [address, normalizedToken] : undefined,
+    query: {
+      enabled: Boolean(address && normalizedToken),
+    },
+  });
+
+  const claimableQuoteText = useMemo(() => {
     if (!quoteToken) return locale.noQuoteToken;
-    return `${formatUnits(claimableFees ?? BigInt(0), Number(quoteDecimals ?? 18))} ${quoteSymbol ?? ''}`.trim();
-  }, [claimableFees, locale.noQuoteToken, quoteDecimals, quoteSymbol, quoteToken]);
+    return `${formatUnits(claimableQuoteFees ?? BigInt(0), Number(quoteDecimals ?? 18))} ${quoteSymbol ?? ''}`.trim();
+  }, [claimableQuoteFees, locale.noQuoteToken, quoteDecimals, quoteSymbol, quoteToken]);
+
+  const claimableTokenText = useMemo(() => {
+    if (!normalizedToken) return '—';
+    return `${formatUnits(claimableTokenFees ?? BigInt(0), Number(tokenDecimals ?? 18))} ${tokenSymbol ?? ''}`.trim();
+  }, [claimableTokenFees, normalizedToken, tokenDecimals, tokenSymbol]);
 
   const parsedMinTokensOut = useMemo(() => {
     try {
@@ -230,17 +269,29 @@ export function TokenChainActions({
   }
 
   async function handleClaim() {
-    if (!quoteToken || !address || !publicClient || !eagleContracts.locker) return;
+    if (!address || !publicClient || !eagleContracts.locker) return;
     await runAction(
       'claim',
       async () => {
-        const hash = await writeContractAsync({
-          address: eagleContracts.locker!,
-          abi: eagleLiquidityLockerAbi,
-          functionName: 'claimFees',
-          args: [quoteToken, address],
-        });
-        await publicClient.waitForTransactionReceipt({ hash });
+        if ((claimableQuoteFees ?? BigInt(0)) > BigInt(0) && quoteToken) {
+          const quoteHash = await writeContractAsync({
+            address: eagleContracts.locker!,
+            abi: eagleLiquidityLockerAbi,
+            functionName: 'claimFees',
+            args: [quoteToken, address],
+          });
+          await publicClient.waitForTransactionReceipt({ hash: quoteHash });
+        }
+
+        if ((claimableTokenFees ?? BigInt(0)) > BigInt(0) && normalizedToken) {
+          const tokenHash = await writeContractAsync({
+            address: eagleContracts.locker!,
+            abi: eagleLiquidityLockerAbi,
+            functionName: 'claimFees',
+            args: [normalizedToken, address],
+          });
+          await publicClient.waitForTransactionReceipt({ hash: tokenHash });
+        }
       },
       locale.claimDone,
     );
@@ -287,8 +338,12 @@ export function TokenChainActions({
           <span className='text-[#f3f1e8]'>{creator ? shorten(creator) : '—'}</span>
         </div>
         <div className='mt-3 flex items-center justify-between gap-3'>
-          <span>{locale.claimable}</span>
-          <span className='text-right text-[#f3f1e8]'>{claimableText}</span>
+          <span>{locale.claimableQuote}</span>
+          <span className='text-right text-[#f3f1e8]'>{claimableQuoteText}</span>
+        </div>
+        <div className='mt-3 flex items-center justify-between gap-3'>
+          <span>{locale.claimableToken}</span>
+          <span className='text-right text-[#f3f1e8]'>{claimableTokenText}</span>
         </div>
         <div className='mt-3 flex items-center justify-between gap-3'>
           <span>{locale.distributor}</span>
@@ -313,7 +368,12 @@ export function TokenChainActions({
         <button
           type='button'
           onClick={handleClaim}
-          disabled={!quoteToken || !isConnected || !isLaunched || busyAction !== null}
+          disabled={
+            !isConnected ||
+            !isLaunched ||
+            busyAction !== null ||
+            ((claimableQuoteFees ?? BigInt(0)) === BigInt(0) && (claimableTokenFees ?? BigInt(0)) === BigInt(0))
+          }
           className='inline-flex h-11 w-full items-center justify-center rounded-full border border-[#e8d79f2f] bg-[#ffffff05] text-sm font-medium text-[#f1e4b7] transition hover:bg-[#ffffff08] disabled:cursor-not-allowed disabled:opacity-60'
         >
           {busyAction === 'claim' ? '...' : isConnected ? locale.claimFees : locale.connectWallet}
