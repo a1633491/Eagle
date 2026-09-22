@@ -1,11 +1,23 @@
+'use client';
+
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { zeroAddress } from 'viem';
+import { type ChainKey, withLangAndChain } from '@/lib/chains';
 import { currency, numberCompact, percent, shorten } from '@/lib/format';
+import { type Lang } from '@/lib/i18n';
 import { getTokenImageUrl } from '@/lib/token-image';
 import { TokenSummary } from '@/lib/types';
 
-export function TokenTable({ tokens }: { tokens: TokenSummary[] }) {
+export function TokenTable({
+  tokens,
+  lang,
+  chainKey,
+}: {
+  tokens: TokenSummary[];
+  lang?: Lang;
+  chainKey?: ChainKey;
+}) {
   return (
     <div className="overflow-x-auto rounded-[22px] border border-white/8 bg-[#1a1c19]/95">
       <table className="min-w-[760px] text-left text-sm text-[#cad0c0]">
@@ -24,7 +36,10 @@ export function TokenTable({ tokens }: { tokens: TokenSummary[] }) {
           {tokens.map((token) => (
             <tr key={token.address} className="border-b border-white/6 transition hover:bg-white/[0.025]">
               <td className="px-4 py-3">
-                <Link href={`/token?address=${token.address}`} className="flex items-center gap-3">
+                <Link
+                  href={lang && chainKey ? withLangAndChain(`/token?address=${token.address}`, lang, chainKey) : `/token?address=${token.address}`}
+                  className="flex items-center gap-3"
+                >
                   {getTokenImageUrl(token.metadataURI) ? (
                     <img
                       src={getTokenImageUrl(token.metadataURI)}
