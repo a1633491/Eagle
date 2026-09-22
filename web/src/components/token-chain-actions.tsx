@@ -9,8 +9,8 @@ import { type ChainKey } from '@/lib/chains';
 import {
   eagleDistributorFactoryAbi,
   eagleErc20Abi,
-  eagleFactoryAbi,
   eagleLiquidityLockerAbi,
+  getLaunchFactoryAbi,
 } from '@/lib/contracts';
 import { type Lang } from '@/lib/i18n';
 
@@ -115,22 +115,24 @@ export function TokenChainActions({
   const [minTokensOut, setMinTokensOut] = useState('0');
 
   const normalizedToken = isAddress(tokenAddress) ? (tokenAddress as Address) : undefined;
+  const factoryAbi = getLaunchFactoryAbi(chainKey);
 
   const { data: launchRecord } = useReadContract({
     chainId: eagleContracts.chainId,
     address: eagleContracts.factory,
-    abi: eagleFactoryAbi,
+    abi: factoryAbi,
     functionName: 'launches',
     args: normalizedToken ? [normalizedToken] : undefined,
     query: {
       enabled: Boolean(normalizedToken),
     },
   });
+  const launchRecordTuple = launchRecord as readonly unknown[] | undefined;
 
-  const quoteToken = launchRecord?.[1];
-  const creator = launchRecord?.[3];
-  const pool = launchRecord?.[2];
-  const isLaunched = Boolean(pool && pool !== zeroAddress);
+  const quoteToken = launchRecordTuple?.[1] as Address | undefined;
+  const creator = launchRecordTuple?.[chainKey === 'robinhood' ? 2 : 3] as Address | undefined;
+  const pool = (chainKey === 'robinhood' ? undefined : launchRecordTuple?.[2]) as Address | undefined;
+  const isLaunched = chainKey === 'robinhood' ? Boolean(creator && creator !== zeroAddress) : Boolean(pool && pool !== zeroAddress);
 
   const { data: distributorOf } = useReadContract({
     chainId: eagleContracts.chainId,

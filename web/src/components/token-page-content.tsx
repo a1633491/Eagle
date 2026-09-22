@@ -110,10 +110,10 @@ export function TokenPageContent({ lang, token, chainKey }: { lang: Lang; token:
   });
   const launchRecordTuple = launchRecord as readonly unknown[] | undefined;
   const onchainQuoteToken = readAddress(launchRecordTuple?.[1]);
-  const onchainPool = readAddress(launchRecordTuple?.[2]);
-  const onchainCreator = readAddress(launchRecordTuple?.[3]);
-  const onchainFeeTier = readNumber(launchRecordTuple?.[4]);
-  const onchainLaunchBlock = readBigint(launchRecordTuple?.[5]);
+  const onchainPool = chainKey === 'robinhood' ? undefined : readAddress(launchRecordTuple?.[2]);
+  const onchainCreator = readAddress(launchRecordTuple?.[chainKey === 'robinhood' ? 2 : 3]);
+  const onchainFeeTier = readNumber(launchRecordTuple?.[chainKey === 'robinhood' ? 3 : 4]);
+  const onchainLaunchBlock = readBigint(launchRecordTuple?.[chainKey === 'robinhood' ? 7 : 5]);
 
   const { data: tokenSymbolData } = useReadContract({
     chainId: contracts.chainId,

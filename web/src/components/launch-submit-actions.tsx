@@ -598,7 +598,7 @@ export function LaunchSubmitActions({
   const resolvedPredictedDistributorAddress = readAddress(predictedDistributorAddress);
 
   const holderFeeUnsupported = feeTarget === 'holders' && !supportsHolderDistributor;
-  const firstBuyUnsupported = false;
+  const firstBuyUnsupported = chainKey === 'robinhood' && Boolean(firstBuyAmount && firstBuyAmount > BigInt(0));
   const needsApproval = !nativeFirstBuyUsesValue && Boolean(firstBuyAmount && firstBuyAmount > BigInt(0));
 
   const { data: currentAllowance, refetch: refetchAllowance } = useReadContract({
@@ -715,33 +715,71 @@ export function LaunchSubmitActions({
         return;
       }
       const launchArgs = [
-        {
-          name: name.trim(),
-          symbol: ticker.trim(),
-          metadataURI: metadataUri,
-          totalSupply: parsedTotalSupply,
-          quoteToken: resolvedQuoteToken,
-          fee: feeTier,
-          initialTick: parsedInitialTick,
-          positions: [],
-          creatorFeeRecipient,
-          initialBuyQuoteAmount: firstBuyAmount,
-          initialBuyMinTokensOut: parsedInitialBuyMinTokensOut,
-          initialBuyRecipient: zeroAddress,
-          salt,
-          maxLaunchFeeWei: effectiveLaunchFee,
-        },
+        chainKey === 'robinhood'
+          ? {
+              name: name.trim(),
+              symbol: ticker.trim(),
+              metadataURI: metadataUri,
+              totalSupply: parsedTotalSupply,
+              quoteToken: resolvedQuoteToken,
+              fee: feeTier,
+              tickSpacing,
+              initialTick: parsedInitialTick,
+              hooks: zeroAddress,
+              positions: [],
+              creatorFeeRecipient,
+              initialBuyQuoteAmount: firstBuyAmount,
+              initialBuyMinTokensOut: parsedInitialBuyMinTokensOut,
+              initialBuyRecipient: zeroAddress,
+              salt,
+              maxLaunchFeeWei: effectiveLaunchFee,
+            }
+          : {
+              name: name.trim(),
+              symbol: ticker.trim(),
+              metadataURI: metadataUri,
+              totalSupply: parsedTotalSupply,
+              quoteToken: resolvedQuoteToken,
+              fee: feeTier,
+              initialTick: parsedInitialTick,
+              positions: [],
+              creatorFeeRecipient,
+              initialBuyQuoteAmount: firstBuyAmount,
+              initialBuyMinTokensOut: parsedInitialBuyMinTokensOut,
+              initialBuyRecipient: zeroAddress,
+              salt,
+              maxLaunchFeeWei: effectiveLaunchFee,
+            },
       ];
       const txValue = effectiveLaunchFee + (nativeFirstBuyUsesValue ? firstBuyAmount : BigInt(0));
+      const launchInputFields =
+        (factoryAbi.find(
+          (item): item is Abi[number] & { type: 'function'; name: 'launch'; inputs: Array<{ components?: Array<{ name?: string }> }> } =>
+            item.type === 'function' && item.name === 'launch',
+        )?.inputs?.[0]?.components ?? []
+        ).map((component) => component.name ?? '');
+      // #region debug-point A:robinhood-launch-preflight
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"robinhood-launch-fail",runId:"pre-fix",hypothesisId:"A",location:"web/src/components/launch-submit-actions.tsx:handleLaunch:preflight",msg:"[DEBUG] Robinhood launch preflight parameters prepared",data:{traceId:salt,chainKey,factory:contracts.factory,address,quoteToken:resolvedQuoteToken,feeTier,tickSpacing,initialTick:String(parsedInitialTick),launchFeeWei:String(effectiveLaunchFee),firstBuyAmount:String(firstBuyAmount),initialBuyMinTokensOut:String(parsedInitialBuyMinTokensOut),creatorFeeRecipient,feeTarget,nativeFirstBuyUsesValue,txValue:String(txValue),abiLaunchFields:launchInputFields},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       setStatus(locale.preflightLaunch);
-      await publicClient.estimateContractGas({
-        account: address as Address,
-        address: contracts.factory,
-        abi: factoryAbi,
-        functionName: 'launch',
-        args: launchArgs,
-        value: txValue,
-      });
+      try {
+        await publicClient.estimateContractGas({
+          account: address as Address,
+          address: contracts.factory,
+          abi: factoryAbi,
+          functionName: 'launch',
+          args: launchArgs,
+          value: txValue,
+        });
+        // #region debug-point B:robinhood-launch-estimate-ok
+        fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"robinhood-launch-fail",runId:"pre-fix",hypothesisId:"B",location:"web/src/components/launch-submit-actions.tsx:handleLaunch:estimate",msg:"[DEBUG] Launch gas estimation succeeded",data:{traceId:salt,chainKey,factory:contracts.factory,quoteToken:resolvedQuoteToken},ts:Date.now()})}).catch(()=>{});
+        // #endregion
+      } catch (error) {
+        // #region debug-point B:robinhood-launch-estimate-failed
+        fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"robinhood-launch-fail",runId:"pre-fix",hypothesisId:"B",location:"web/src/components/launch-submit-actions.tsx:handleLaunch:estimate",msg:"[DEBUG] Launch gas estimation failed",data:{traceId:salt,chainKey,factory:contracts.factory,error:error instanceof Error ? error.message : String(error)},ts:Date.now()})}).catch(()=>{});
+        // #endregion
+        throw error;
+      }
       setStatus(locale.waitingLaunch);
       const hash = await writeContractAsync({
         address: contracts.factory,
@@ -750,6 +788,9 @@ export function LaunchSubmitActions({
         args: launchArgs,
         value: txValue,
       });
+      // #region debug-point C:robinhood-launch-wallet-submitted
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"robinhood-launch-fail",runId:"pre-fix",hypothesisId:"C",location:"web/src/components/launch-submit-actions.tsx:handleLaunch:write",msg:"[DEBUG] Launch transaction submitted to wallet",data:{traceId:salt,chainKey,factory:contracts.factory,hash},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
       const launchEvents = parseEventLogs({
         abi: factoryAbi,
@@ -775,7 +816,8 @@ export function LaunchSubmitActions({
             functionName: 'launches',
             args: [launchedTokenAddress],
           })) as readonly unknown[];
-          const poolAddress = readAddress(eventArgs?.pool) ?? readAddress(launchRecord?.[2]) ?? zeroAddress;
+          const poolAddress =
+            chainKey === 'robinhood' ? zeroAddress : (readAddress(eventArgs?.pool) ?? readAddress(launchRecord?.[2]) ?? zeroAddress);
           const quoteToken = readAddress(eventArgs?.quoteToken) ?? readAddress(launchRecord?.[1]);
           if (poolAddress && quoteToken) {
             await registerLaunchedTokenWithRetry({
@@ -817,6 +859,9 @@ export function LaunchSubmitActions({
         router.push(`/token?address=${launchedTokenAddress}&lang=${lang}&chain=${chainKey}`);
       }
     } catch (error) {
+      // #region debug-point D:robinhood-launch-catch
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"robinhood-launch-fail",runId:"pre-fix",hypothesisId:"D",location:"web/src/components/launch-submit-actions.tsx:handleLaunch:catch",msg:"[DEBUG] Launch flow failed",data:{traceId:salt,chainKey,factory:contracts.factory,error:error instanceof Error ? error.message : String(error)},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       setStatus(normalizeError(error, locale.failedPrefix));
     } finally {
       setIsBusy(false);
